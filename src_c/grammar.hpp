@@ -537,7 +537,7 @@ static Vec<Shared<Token>> tokenize(const Grammar & grammar, const char * _text)
         };
         auto skip_comment = [&]()
         {
-            if (starts_with(&text[i], "//"))
+            if (starts_with(&text[i], "//") || text[i] == '#')
             {
                 while (text[i] != '\n' && text[i] != 0)
                     i++;
@@ -766,6 +766,8 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
         
         size_t same_consec = 0;
         
+        bool hit_fallible = false;
+        
         while (i < form->rules.size())
         {
             assert(token_index <= tokens.size());
@@ -854,8 +856,9 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
                 }
             }
             
-            if (rule.qualifier == MATCH_QUAL_STAR)
+            if (rule.qualifier == MATCH_QUAL_STAR || (rule.qualifier == MATCH_QUAL_PLUS && same_consec > 0))
             {
+                hit_fallible = true;
                 if (start_i != i)
                     i = start_i;
                 else
@@ -863,46 +866,51 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
             }
             else if (rule.qualifier == MATCH_QUAL_MAYBE)
             {
+                hit_fallible = true;
                 if (start_i == i)
                     i = start_i + 1;
             }
-            else if (start_i == i || (rule.qualifier == MATCH_QUAL_PLUS && same_consec == 0))
+            else if (start_i == i)
             {
                 bool found = false;
                 // backtracking for shallow */? rules
-                for (size_t n = progress.size(); n > 0; n--)
+                for (size_t n = progress.size(); hit_fallible && n > 0; n--)
                 {
                     auto used_rule = progress[n - 1]->rule;
                     if (!used_rule) throw;
-                    //puts("lf bt........");
-                    if (used_rule->qualifier == MATCH_QUAL_MAYBE || used_rule->qualifier == MATCH_QUAL_STAR)
+                    if (used_rule->qualifier == MATCH_QUAL_MAYBE || used_rule->qualifier == MATCH_QUAL_STAR || used_rule->qualifier == MATCH_QUAL_PLUS)
                     {
+                        if (used_rule->qualifier == MATCH_QUAL_PLUS)
+                        {
+                            if (n - 1 == 0)
+                                continue;
+                            if (progress[n - 2]->rule != used_rule)
+                            {
+                                puts("---only one. can't.");
+                                continue;
+                            }
+                        }
+                        
                         while (form->rules[i] != used_rule)
                             i -= 1;
+                        prev_i = i;
                         i += 1;
-                        
-                        token_index = progress[n - 1]->token_index;
-                        
-                        while (progress.size() >= n)
-                            progress.pop_back();
                         
                         same_consec = 0;
                         
-                        //puts("found backtracking!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                        printf("backtracking to location %zd...\n", token_index);
+                        token_index = progress[n - 1]->token_index;
+                        
+                        while (progress.size() > n - 1)
+                            progress.pop_back();
                         
                         found = true;
+                        break;
                     }
                 }
                 if (!found)
                     break;
-            }
-            else if (rule.qualifier == MATCH_QUAL_PLUS)
-            {
-                if (start_i != i)
-                    i = start_i;
                 else
-                    i = start_i + 1;
+                    continue;
             }
             
             if (prev_i == i)

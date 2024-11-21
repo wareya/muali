@@ -7,7 +7,7 @@
 #include "types.hpp"
 
 #include "grammar.hpp"
-//#include "compiler.hpp"
+#include "compiler.hpp"
 
 int main(int argc, char ** argv)
 {
@@ -49,12 +49,14 @@ int main(int argc, char ** argv)
         return 0;
     }
     
+    size_t i = 0;
     for (auto n : tokens)
     {
         if (n->from_regex)
-            printf("> %s (via %s)\n", n->text->data(), n->from_regex->str.data());
+            printf("> %zd\t%s (via %s)\n", i, n->text->data(), n->from_regex->str.data());
         else
-            printf("> %s\n", n->text->data());
+            printf("> %zd\t%s\n", i, n->text->data());
+        i += 1;
     }
     
     auto asdf = parse_as(grammar, tokens, "program");

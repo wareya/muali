@@ -1,3 +1,5 @@
 func main(a, asdf):
-	main(a, asdf)
+	f();
+    f2()();
+    # main(a, asdf)
 end
