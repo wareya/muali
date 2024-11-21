@@ -723,7 +723,7 @@ struct ListMap {
         size_t insert_i = 0;
         //bsearch_up(insert_i, list.size(), [&](auto avg) { return !(key < list[avg]._0); });
         bsearch_up(insert_i, list.size(), [&](auto avg) { return list[avg]._0 < key; });
-        printf("%zd %zd %zd\n", insert_i, asdf, list.size());
+        //printf("%zd %zd %zd\n", insert_i, asdf, list.size());
         if (insert_i != asdf)
         {
         //    printf("%s %s\n", list[insert_i]._0.data(), list[asdf]._0.data());

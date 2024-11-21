@@ -1,0 +1,3 @@
+func main(a, asdf):
+	main(a, asdf)
+end

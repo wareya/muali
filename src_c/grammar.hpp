@@ -164,6 +164,8 @@ static auto load_grammar(const char * text) -> Grammar
     
     size_t len = strlen(text);
     size_t i = 0;
+    size_t line_progress = 0;
+    size_t line_start_i = 0;
     
     auto line_is_at_eol = [&]()
     {
@@ -186,7 +188,11 @@ static auto load_grammar(const char * text) -> Grammar
         while (!line_is_at_eol())
             i++;
         while (line_is_at_eol() && text[i] != 0)
+        {
             i++;
+            line_progress += 1;
+            line_start_i = i;
+        }
     };
     
     auto is_start_of_name = [](char c)
@@ -337,6 +343,7 @@ static auto load_grammar(const char * text) -> Grammar
                     current_point->forms.push_back(GrammarForm{}); // dummy to match full-fledged forms in having a dummy at the end
                     auto rule = new_rule_point(current_point);
                     all_points.insert(current_point);
+                    if (point_stack.size() == 0) throw;
                     current_point = point_stack.back();
                     point_stack.pop_back();
                     current_point->forms.back().rules.push_back(rule);
@@ -616,8 +623,10 @@ struct ASTNode
     size_t start_row = 1;
     size_t start_column = 1;
     size_t token_count = 0;
+    size_t token_index = 0;
     Shared<String> text;
     bool is_token = false;
+    Shared<MatchingRule> rule;
 };
 
 static inline void print_AST(Shared<ASTNode> node, size_t depth)
@@ -652,9 +661,15 @@ static inline void print_AST(Shared<ASTNode> node)
     print_AST(node, 0);
 }
 
-static Shared<ASTNode> ast_node_from_token(Shared<Token> token)
+static inline void AST_delete_token_refs(Shared<ASTNode> node)
 {
-    return MakeShared<ASTNode>(ASTNode{{}, token->row, token->column, 1, token->text, true});
+    node->rule = 0;
+    for (auto c : node->children)
+        AST_delete_token_refs(c);
+}
+static Shared<ASTNode> ast_node_from_token(Shared<Token> token, size_t token_index, Shared<MatchingRule> rule)
+{
+    return MakeShared<ASTNode>(ASTNode{{}, token->row, token->column, 1, token_index, token->text, true, rule});
 }
 
 struct ParseRecord
@@ -709,26 +724,27 @@ static void clear_parser_global_state()
 static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_index, Shared<GrammarPoint> node_type, size_t depth) -> Option<Shared<ASTNode>>
 {
     const bool PARSER_DO_DEBUG_PRINT = false;
+    //const bool PARSER_DO_DEBUG_PRINT = true;
     
     auto indent = [&](){for (size_t i = 0; i < depth; i++) printf(" ");};
     
     if (node_type->name && PARSER_DO_DEBUG_PRINT)
     {
         indent();
-        printf("+ checking for a... %s\n", node_type->name->data());
+        //printf("+ checking for a... %s\n", node_type->name->data());
     }
     auto base_key = ParseRecord{starting_token_index, node_type->name};
     
     if (node_type->name && parse_hits.count(base_key) > 0)
     {
-        puts("returning early A");
+        //puts("returning early A");
         auto asdf = parse_hits[base_key];
-        printf("%p\n", asdf.get());
+        //printf("%p\n", asdf.get());
         return {asdf};
     }
     if (node_type->name && parse_misses.count(base_key) > 0)
     {
-        puts("returning early B");
+        //puts("returning early B");
         return {};
     }
     
@@ -754,7 +770,8 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
         {
             assert(token_index <= tokens.size());
             
-            auto & rule = *form->rules[i];
+            auto rule_ref = form->rules[i];
+            auto & rule = *rule_ref;
             
             if (token_index > furthest)
             {
@@ -808,15 +825,16 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
                     indent();
                     puts("match!");
                 }
+                progress.push_back(ast_node_from_token(token, token_index, rule_ref));
                 token_index += 1;
                 i += 1;
-                progress.push_back(ast_node_from_token(token));
             }
             else if (rule.kind == MATCH_KIND_POINT)
             {
                 assert(rule.rule);
                 if (auto parse = parse_with(tokens, token_index, rule.rule, depth + 1))
                 {
+                    (*parse)->rule = rule_ref;
                     if (PARSER_DO_DEBUG_PRINT)
                     {
                         indent();
@@ -843,24 +861,48 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
                 else
                     i = start_i + 1;
             }
-            else if (rule.qualifier == MATCH_QUAL_PLUS)
-            {
-                if (start_i != i)
-                    i = start_i;
-                else if (same_consec == 0)
-                    break;
-                else
-                    i = start_i + 1;
-            }
             else if (rule.qualifier == MATCH_QUAL_MAYBE)
             {
                 if (start_i == i)
                     i = start_i + 1;
             }
-            else
+            else if (start_i == i || (rule.qualifier == MATCH_QUAL_PLUS && same_consec == 0))
             {
-                if (start_i == i)
+                bool found = false;
+                // backtracking for shallow */? rules
+                for (size_t n = progress.size(); n > 0; n--)
+                {
+                    auto used_rule = progress[n - 1]->rule;
+                    if (!used_rule) throw;
+                    //puts("lf bt........");
+                    if (used_rule->qualifier == MATCH_QUAL_MAYBE || used_rule->qualifier == MATCH_QUAL_STAR)
+                    {
+                        while (form->rules[i] != used_rule)
+                            i -= 1;
+                        i += 1;
+                        
+                        token_index = progress[n - 1]->token_index;
+                        
+                        while (progress.size() >= n)
+                            progress.pop_back();
+                        
+                        same_consec = 0;
+                        
+                        //puts("found backtracking!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                        printf("backtracking to location %zd...\n", token_index);
+                        
+                        found = true;
+                    }
+                }
+                if (!found)
                     break;
+            }
+            else if (rule.qualifier == MATCH_QUAL_PLUS)
+            {
+                if (start_i != i)
+                    i = start_i;
+                else
+                    i = start_i + 1;
             }
             
             if (prev_i == i)
@@ -877,6 +919,7 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
             ret.start_row = tokens[starting_token_index]->row;
             ret.start_column = tokens[starting_token_index]->column;
             ret.token_count = token_index - starting_token_index;
+            ret.token_index = starting_token_index;
             ret.text = node_type->name;
             ret.is_token = false;
             if (PARSER_DO_DEBUG_PRINT)
@@ -926,6 +969,8 @@ static auto parse_as(Grammar & grammar, const Vec<Shared<Token>> & tokens, const
     auto ret = parse_with(tokens, 0, point, 0);
     if (ret && (*ret)->token_count != tokens.size())
         ret = {};
+    else if (ret)
+        AST_delete_token_refs(*ret);
     clear_parser_global_state();
     return ret;
 }

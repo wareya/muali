@@ -1,0 +1,126 @@
+int:
+rx%[0-9]+%rx
+
+float:
+rx%[0-9]*\.[0-9]+%rx
+rx%[0-9]+\.[0-9]*%rx
+
+string:
+rx%"(?:[^\\"]|\\.)*"%rx
+
+name:
+rx%[a-zA-Z_][a-zA-Z_0-9]*%rx
+
+null:
+"null"
+
+simple_expr: @notokens
+"(" expr ")"
+int | float | string | null | name
+
+funccall: @notokens
+"(" (expr ",")* expr? ")"
+
+index: @notokens
+"[" expr "]"
+
+dismember: @notokens
+"." name
+
+expr_tail_0:
+funccall
+index
+dismember
+
+base_unexp:
+simple_expr expr_tail_0*
+
+funccall_statement:
+simple_expr expr_tail_0* funccall
+
+base_binexp:
+("-")? base_unexp
+
+binexp_3: @left_recursive
+base_binexp ("*"|"/"|"%"|"<<"|">>") binexp_0
+base_binexp
+
+binexp_2: @left_recursive
+binexp_3 ("+"|"-"|"&"|"|"|"^") binexp_0
+binexp_3
+
+binexp_1: @left_recursive
+binexp_2 ("=="|"!="|">="|"<="|">"|"<") binexp_0
+binexp_2
+
+binexp_0: @left_recursive
+binexp_1 ("and"|"or") binexp_0
+binexp_1
+
+expr:
+if_ternary
+binexp_0
+
+vardec: @notokens
+"var" name "=" expr
+"var" name
+
+globalvardec: @notokens
+"var" name "=" expr
+
+elif: @notokens
+("else" "if" | "elif") "(" expr ")" ":" block
+
+else: @notokens
+"else" ":" block
+
+if: @notokens
+"if" "(" expr ")" ":" block elif* else? "end"
+
+elif_short: @notokens
+"else" "if" "(" expr ")" simple_statement
+
+else_short: @notokens
+"else" simple_statement
+
+if_short: @notokens
+"if" "(" expr ")" statement elif_short* else_short?
+
+elif_short: @notokens
+"else" "if" "(" expr ")" simple_statement
+
+if_ternary: @notokens
+"if" "(" expr ")" expr "else" expr
+
+while: @notokens
+"while" "(" expr ")" ":" block "end"
+
+while_short: @notokens
+"while" "(" expr ")" statement
+
+return: @notokens
+"return" expr?
+
+pass: @notokens
+"pass"
+
+assign: @notokens
+name "=" expr
+
+statement:
+(if | if_short | while | while_short | vardec | assign | funccall_statement | return | pass) (";")?
+
+simple_statement:
+(vardec | assign | funccall_statement | return | pass) (";")?
+
+block: @notokens
+statement*
+
+funcdefargs: @notokens
+"(" (name ",")* name? ")"
+
+funcdef:
+"func" name funcdefargs ":" block "end"
+
+program:
+(funcdef | globalvardec)+
