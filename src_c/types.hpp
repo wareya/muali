@@ -835,6 +835,21 @@ public:
     
     String & operator=(const String & other) = default;
     
+    
+    bool starts_with(const String & b)
+    {
+        if (size() < b.size())
+            return false;
+        return strncmp(data(), b.data(), b.size()) == 0;
+    }
+    bool starts_with(const char * b)
+    {
+        size_t b_size = strlen(b);
+        if (size() < b_size)
+            return false;
+        return strncmp(data(), b, b_size) == 0;
+    }
+    
     bool operator==(const String & other) const
     {
         if (other.size() != size())
@@ -846,6 +861,17 @@ public:
                 return false;
         }
         return true;
+    }
+    
+    bool operator==(const char * other) const
+    {
+        size_t i = 0;
+        for (i = 0; i < size() && other[i] != 0; i++)
+        {
+            if ((*this)[i] != other[i])
+                return false;
+        }
+        return i == size();
     }
     
     bool operator<(const String & other) const
@@ -913,14 +939,14 @@ public:
         return ret;
     }
     
-    String() noexcept { }
-    String(const String & other)
+    constexpr String() noexcept { }
+    constexpr String(const String & other)
     {
         bytes = other.bytes;
         memcpy(shortstr, other.shortstr, 7);
         shortstr_len = other.shortstr_len;
     }
-    String(const char * data)
+    constexpr String(const char * data)
     {
         size_t len = 0;
         while (data[len++] != 0);

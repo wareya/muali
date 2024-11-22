@@ -1,9 +1,9 @@
 int:
-rx%[0-9]+%rx
+rx%[-+]?[0-9]+%rx
 
 float:
-rx%[0-9]*\.[0-9]+%rx
-rx%[0-9]+\.[0-9]*%rx
+rx%[-+]?[0-9]*\.[0-9]+%rx
+rx%[-+]?[0-9]+\.[0-9]*%rx
 
 string:
 rx%"(?:[^\\"]|\\.)*"%rx
@@ -39,7 +39,7 @@ funccall_statement:
 simple_expr expr_tail_0* funccall
 
 base_binexp:
-("-")? base_unexp
+("-"|"+")? base_unexp
 
 binexp_3: @left_recursive
 base_binexp ("*"|"/"|"%"|"<<"|">>") binexp_0
@@ -78,16 +78,16 @@ if: @notokens
 "if" "(" expr ")" ":" block elif* else? "end"
 
 elif_short: @notokens
-"else" "if" "(" expr ")" simple_statement
+"else" "if" "(" expr ")" simple_block
 
 else_short: @notokens
-"else" simple_statement
+"else" simple_block
 
 if_short: @notokens
-"if" "(" expr ")" statement elif_short* else_short?
+"if" "(" expr ")" simple_block elif_short* else_short?
 
 elif_short: @notokens
-"else" "if" "(" expr ")" simple_statement
+"else" "if" "(" expr ")" simple_block
 
 if_ternary: @notokens
 "if" "(" expr ")" expr "else" expr
@@ -96,7 +96,7 @@ while: @notokens
 "while" "(" expr ")" ":" block "end"
 
 while_short: @notokens
-"while" "(" expr ")" statement
+"while" "(" expr ")" simple_block
 
 return: @notokens
 "return" expr?
@@ -107,11 +107,14 @@ pass: @notokens
 assign: @notokens
 name "=" expr
 
-statement:
-(if | if_short | while | while_short | vardec | assign | funccall_statement | return | pass) (";")?
+statement: @notokens
+(if | if_short | while | while_short | vardec | assign | funccall_statement | return | pass) ";"?
 
-simple_statement:
-(vardec | assign | funccall_statement | return | pass) (";")?
+simple_statement: @notokens
+(vardec | assign | funccall_statement | return | pass) ";"?
+
+simple_block: @notokens
+simple_statement
 
 block: @notokens
 statement*
@@ -119,7 +122,7 @@ statement*
 funcdefargs: @notokens
 "(" (name ",")* name? ")"
 
-funcdef:
+funcdef: @notokens
 "func" name funcdefargs ":" block "end"
 
 program:

@@ -8,6 +8,7 @@
 
 #include "grammar.hpp"
 #include "compiler.hpp"
+#include "interpreter.hpp"
 
 int main(int argc, char ** argv)
 {
@@ -67,6 +68,30 @@ int main(int argc, char ** argv)
         puts("failed to parse");
         return 0;
     }
+    
+    print_AST(*asdf);
+    
+    puts("bxvlhir");
+    
+    auto compiled = compile_root(*asdf);
+    
+    puts("aogiogw");
+    
+    for (auto func : compiled.funcs)
+    {
+        puts("----");
+        for (auto byte : func->code)
+            printf("%02X ", byte);
+        puts("");
+    }
+    
+    Interpreter interpreter(compiled);
+    
+    auto ret = interpreter.call_func_by_name("main", {});
+    
+    printf("main returned %zd\n", ret.data.integer);
+    
+    //throw ret;
     
     return 0;
 }

@@ -599,7 +599,12 @@ public:
     }
     
     Rope() = default;
-    Rope(Rope &&) = default;
+    Rope(Rope && other)
+    {
+        root = other.root;
+        other.root = 0;
+        kill_cache();
+    }
     Rope(const Rope & other)
     {
         if (other.root)
@@ -612,7 +617,15 @@ public:
         root = 0;
     }
     
-    Rope & operator=(Rope && other) = default;
+    Rope & operator=(Rope && other)
+    {
+        if (root) kill_root();
+        
+        root = other.root;
+        other.root = 0;
+        kill_cache();
+        return *this;
+    }
     Rope & operator=(const Rope & other)
     {
         if (root) kill_root();

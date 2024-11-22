@@ -1,5 +1,5 @@
 func main(a, asdf):
-	f();
-    f2()();
-    # main(a, asdf)
+    var x = 31415
+    var y = -10552
+    return x + y
 end

@@ -52,10 +52,7 @@ struct MatchingRule {
     Shared<String> text = 0;
     Shared<Regex> compiled_regex = 0;
     Shared<GrammarPoint> rule = 0;
-    // qualified matches are possessive-greedy by default
     MatchQualifier qualifier = MATCH_QUAL_DEFAULT;
-    bool lazy = false;
-    bool greedy = false;
 };
 
 struct GrammarForm {
@@ -371,9 +368,7 @@ static auto load_grammar(const char * text) -> Grammar
                     }
                     else
                     {
-                        assert(!form.rules.back()->lazy);
-                        assert(!form.rules.back()->greedy);
-                        form.rules.back()->greedy = true;
+                        assert(0);
                     }
                     i += 1;
                 }
@@ -387,9 +382,7 @@ static auto load_grammar(const char * text) -> Grammar
                     }
                     else
                     {
-                        assert(!form.rules.back()->lazy);
-                        assert(!form.rules.back()->greedy);
-                        form.rules.back()->lazy = true;
+                        assert(0);
                     }
                     i += 1;
                 }
@@ -723,6 +716,9 @@ static void clear_parser_global_state()
 
 static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_index, Shared<GrammarPoint> node_type, size_t depth) -> Option<Shared<ASTNode>>
 {
+    //const bool PARSER_DEBUG_DISABLE_MEMOIZATION = true;
+    const bool PARSER_DEBUG_DISABLE_MEMOIZATION = false;
+    
     const bool PARSER_DO_DEBUG_PRINT = false;
     //const bool PARSER_DO_DEBUG_PRINT = true;
     
@@ -767,6 +763,7 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
         size_t same_consec = 0;
         
         bool hit_fallible = false;
+        bool failed = false;
         
         while (i < form->rules.size())
         {
@@ -792,20 +789,22 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
             
             if (token_index == tokens.size())
             {
-                if (token_index == tokens.size() && (rule.qualifier == MATCH_QUAL_STAR || rule.qualifier == MATCH_QUAL_MAYBE))
+                if (rule.qualifier == MATCH_QUAL_STAR || rule.qualifier == MATCH_QUAL_MAYBE)
+                {
+                    i += 1;
+                    continue;
+                }
+                else if (rule.qualifier == MATCH_QUAL_PLUS && same_consec > 0) // FIXME test this
                 {
                     i += 1;
                     continue;
                 }
                 else
                 {
-                    i = form->rules.size();
+                    failed = true;
                     break;
                 }
             }
-            
-            assert(((void)"TODO", rule.lazy == false));
-            assert(((void)"TODO", rule.greedy == false));
             
             size_t start_i = i;
             
@@ -920,7 +919,7 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
             prev_i = i;
         }
         
-        if (i == form->rules.size() && starting_token_index < tokens.size())
+        if (!failed && i == form->rules.size() && starting_token_index < tokens.size())
         {
             ASTNode ret;
             ret.children = std::move(progress);
@@ -954,7 +953,7 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
             
             auto ret_wrapped = MakeShared<ASTNode>(ret);
             
-            if (node_type->name)
+            if (!PARSER_DEBUG_DISABLE_MEMOIZATION && node_type->name)
                 parse_hits.insert(base_key, ret_wrapped);
             
             return {ret_wrapped};
