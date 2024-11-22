@@ -9,8 +9,8 @@ func main():
         //sum = 1.0 * i
         //sum += flip / (2*i - 1)
         //sum += flip / (i*2 - 1)
-        sum += flip / (i*2.0 - 1.0)
-        //sum += flip / (i<<1 - 1)
+        //sum += flip / (i*2.0 - 1.0)
+        sum += flip / (i * 2 - 1)
     end
     return sum * 4.0
 end

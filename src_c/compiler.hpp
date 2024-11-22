@@ -378,10 +378,15 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 else
                     assert(((void)"tried to multiply with an unsupported type", 0));
             }
+            else if (*expr1.var_reg != out_reg)
+            {
+                func->code.push_back(OP_SET);
+                push_varlen_int(func->code, out_reg);
+                push_varlen_int(func->code, *expr1.var_reg);
+            }
             
             func->code.push_back(op_byte);
             push_varlen_int(func->code, out_reg);
-            push_varlen_int(func->code, *expr1.var_reg);
             
             if (expr2.is_var_reg())
                 push_varlen_int(func->code, *expr2.var_reg);
@@ -436,7 +441,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         
         func->code.push_back(op_byte);
         push_varlen_int(func->code, var_index);
-        push_varlen_int(func->code, var_index);
+        //push_varlen_int(func->code, var_index);
         
         if (expr2.is_var_reg())
             push_varlen_int(func->code, *expr2.var_reg);
@@ -470,6 +475,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             {
                 func->code.push_back(OP_RETURNVAL);
                 push_varlen_int(func->code, *expr.var_reg);
+                info.free_register(*expr.var_reg);
             }
             else
                 assert(((void)"TODO assign to value slot", 0));
@@ -519,6 +525,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 auto _expr = compile_func_inner(node->children[1], func, info, global);
                 assert(_expr);
                 auto expr = *_expr;
+                
                 *expr.imm_int -= 1;
                 func->code.push_back(OP_SETIMM);
                 push_varlen_int(func->code, var_index);
@@ -557,8 +564,8 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             
             func->code.push_back(OP_SETIMM);
             push_varlen_int(func->code, var_index);
-            push_immediate(func->code, expr);
             
+            info.free_register(*expr.var_reg);
             assert(((void)"TODO non-immediate-integer foreach", 0));
         }
         

@@ -563,30 +563,30 @@ OPHANDLER_ABI void op_setzeroi(const uint8_t * pc, Variable * vars, Interpreter 
 OPHANDLER_ABI void op_add(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto i_in2 = read_varlen_int(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         auto & var2 = vars[i_in2];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.integer += var2.data.integer;
+                var1.data.integer += var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
             {
-                out.kind = TYPEID_FLOAT;
-                out.data.real = out.data.integer + var2.data.real;
+                var1.kind = TYPEID_FLOAT;
+                var1.data.real = var1.data.integer + var2.data.real;
             }
             break;
         case TYPEID_FLOAT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.real += var2.data.integer;
+                var1.data.real += var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
-                out.data.real += var2.data.real;
+                var1.data.real += var2.data.real;
             break;
         default:
             ASSERT_THROW(((void)"unknown type pair for + operator", 0));
@@ -597,29 +597,29 @@ OPHANDLER_ABI void op_add(const uint8_t * pc, Variable * vars, Interpreter * glo
 OPHANDLER_ABI void op_addimm(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto var2 = read_immediate(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.integer += var2.data.integer;
+                var1.data.integer += var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
             {
-                out.kind = TYPEID_FLOAT;
-                out.data.real = out.data.integer + var2.data.real;
+                var1.kind = TYPEID_FLOAT;
+                var1.data.real = var1.data.integer + var2.data.real;
             }
             break;
         case TYPEID_FLOAT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.real += var2.data.integer;
+                var1.data.real += var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
-                out.data.real += var2.data.real;
+                var1.data.real += var2.data.real;
             break;
         default:
             ASSERT_THROW(((void)"unknown type pair for + operator", 0));
@@ -631,30 +631,30 @@ OPHANDLER_ABI void op_addimm(const uint8_t * pc, Variable * vars, Interpreter * 
 OPHANDLER_ABI void op_sub(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto i_in2 = read_varlen_int(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         auto & var2 = vars[i_in2];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.integer -= var2.data.integer;
+                var1.data.integer -= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
             {
-                out.kind = TYPEID_FLOAT;
-                out.data.real = out.data.integer - var2.data.real;
+                var1.kind = TYPEID_FLOAT;
+                var1.data.real = var1.data.integer - var2.data.real;
             }
             break;
         case TYPEID_FLOAT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.real -= var2.data.integer;
+                var1.data.real -= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
-                out.data.real -= var2.data.real;
+                var1.data.real -= var2.data.real;
             break;
         default:
             ASSERT_THROW(((void)"unknown type pair for - operator", 0));
@@ -665,29 +665,29 @@ OPHANDLER_ABI void op_sub(const uint8_t * pc, Variable * vars, Interpreter * glo
 OPHANDLER_ABI void op_subimm(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto var2 = read_immediate(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.integer -= var2.data.integer;
+                var1.data.integer -= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
             {
-                out.kind = TYPEID_FLOAT;
-                out.data.real = out.data.integer - var2.data.real;
+                var1.kind = TYPEID_FLOAT;
+                var1.data.real = var1.data.integer - var2.data.real;
             }
             break;
         case TYPEID_FLOAT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.real -= var2.data.integer;
+                var1.data.real -= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
-                out.data.real -= var2.data.real;
+                var1.data.real -= var2.data.real;
             break;
         default:
             ASSERT_THROW(((void)"unknown type pair for - operator", 0));
@@ -700,30 +700,30 @@ OPHANDLER_ABI void op_subimm(const uint8_t * pc, Variable * vars, Interpreter * 
 OPHANDLER_ABI void op_mul(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto i_in2 = read_varlen_int(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         auto & var2 = vars[i_in2];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.integer *= var2.data.integer;
+                var1.data.integer *= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
             {
-                out.kind = TYPEID_FLOAT;
-                out.data.real = out.data.integer * var2.data.real;
+                var1.kind = TYPEID_FLOAT;
+                var1.data.real = var1.data.integer * var2.data.real;
             }
             break;
         case TYPEID_FLOAT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.real *= var2.data.integer;
+                var1.data.real *= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
-                out.data.real *= var2.data.real;
+                var1.data.real *= var2.data.real;
             break;
         default:
             ASSERT_THROW(((void)"unknown type pair for * operator", 0));
@@ -734,29 +734,29 @@ OPHANDLER_ABI void op_mul(const uint8_t * pc, Variable * vars, Interpreter * glo
 OPHANDLER_ABI void op_mulimm(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto var2 = read_immediate(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.integer *= var2.data.integer;
+                var1.data.integer *= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
             {
-                out.kind = TYPEID_FLOAT;
-                out.data.real = out.data.integer * var2.data.real;
+                var1.kind = TYPEID_FLOAT;
+                var1.data.real = var1.data.integer * var2.data.real;
             }
             break;
         case TYPEID_FLOAT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.real *= var2.data.integer;
+                var1.data.real *= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
-                out.data.real *= var2.data.real;
+                var1.data.real *= var2.data.real;
             break;
         default:
             ASSERT_THROW(((void)"unknown type pair for * operator", 0));
@@ -768,30 +768,30 @@ OPHANDLER_ABI void op_mulimm(const uint8_t * pc, Variable * vars, Interpreter * 
 OPHANDLER_ABI void op_div(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto i_in2 = read_varlen_int(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         auto & var2 = vars[i_in2];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.integer /= var2.data.integer;
+                var1.data.integer /= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
             {
-                out.kind = TYPEID_FLOAT;
-                out.data.real = out.data.integer / var2.data.real;
+                var1.kind = TYPEID_FLOAT;
+                var1.data.real = var1.data.integer / var2.data.real;
             }
             break;
         case TYPEID_FLOAT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.real /= var2.data.integer;
+                var1.data.real /= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
-                out.data.real /= var2.data.real;
+                var1.data.real /= var2.data.real;
             break;
         default:
             printf("%02X vs %02X (indexes %zu %zu) \n", var1.kind, var2.kind, i_in1, i_in2);
@@ -803,29 +803,29 @@ OPHANDLER_ABI void op_div(const uint8_t * pc, Variable * vars, Interpreter * glo
 OPHANDLER_ABI void op_divimm(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto var2 = read_immediate(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.integer /= var2.data.integer;
+                var1.data.integer /= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
             {
-                out.kind = TYPEID_FLOAT;
-                out.data.real = out.data.integer / var2.data.real;
+                var1.kind = TYPEID_FLOAT;
+                var1.data.real = var1.data.integer / var2.data.real;
             }
             break;
         case TYPEID_FLOAT:
-            out = var1;
+            //out = var1;
             if (var2.kind == TYPEID_INT)
-                out.data.real /= var2.data.integer;
+                var1.data.real /= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
-                out.data.real /= var2.data.real;
+                var1.data.real /= var2.data.real;
             break;
         default:
             printf("%02X vs %02X (index %zu) \n", var1.kind, var2.kind, i_in1);
@@ -839,29 +839,29 @@ OPHANDLER_ABI void op_divimm(const uint8_t * pc, Variable * vars, Interpreter * 
 OPHANDLER_ABI void op_shl(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto i_in2 = read_varlen_int(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         auto & var2 = vars[i_in2];
         assert(var1.kind == TYPEID_INT && var2.kind == TYPEID_INT);
-        out = var1;
-        out.data.integer <<= var2.data.integer;
+        //out = var1;
+        var1.data.integer <<= var2.data.integer;
     }
     CALL_NEXT();
 }
 OPHANDLER_ABI void op_shlimm(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto var2 = read_immediate(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         assert(var1.kind == TYPEID_INT && var2.kind == TYPEID_INT);
-        out = var1;
-        out.data.integer <<= var2.data.integer;
+        //out = var1;
+        var1.data.integer <<= var2.data.integer;
     }
     CALL_NEXT();
 }
@@ -870,29 +870,29 @@ OPHANDLER_ABI void op_shlimm(const uint8_t * pc, Variable * vars, Interpreter * 
 OPHANDLER_ABI void op_shr(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto i_in2 = read_varlen_int(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         auto & var2 = vars[i_in2];
         assert(var1.kind == TYPEID_INT && var2.kind == TYPEID_INT);
-        out = var1;
-        out.data.integer >>= var2.data.integer;
+        //out = var1;
+        var1.data.integer >>= var2.data.integer;
     }
     CALL_NEXT();
 }
 OPHANDLER_ABI void op_shrimm(const uint8_t * pc, Variable * vars, Interpreter * global)
 {
     {
-        auto i_out = read_varlen_int(pc);
+        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto var2 = read_immediate(pc);
-        auto & out = vars[i_out];
+        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         assert(var1.kind == TYPEID_INT && var2.kind == TYPEID_INT);
-        out = var1;
-        out.data.integer >>= var2.data.integer;
+        //out = var1;
+        var1.data.integer >>= var2.data.integer;
     }
     CALL_NEXT();
 }
