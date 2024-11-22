@@ -34,7 +34,7 @@ int main(int argc, char ** argv)
     
     puts("HW!");
     
-    debug_print_grammar_points(grammar);
+    // debug_print_grammar_points(grammar);
     
     auto tokens = tokenize(grammar, text2.data());
     
@@ -51,7 +51,7 @@ int main(int argc, char ** argv)
     }
     
     size_t i = 0;
-    for (auto n : tokens)
+    if (0) for (auto n : tokens)
     {
         if (n->from_regex)
             printf("> %zd\t%s (via %s)\n", i, n->text->data(), n->from_regex->str.data());
@@ -69,7 +69,7 @@ int main(int argc, char ** argv)
         return 0;
     }
     
-    print_AST(*asdf);
+    //print_AST(*asdf);
     
     puts("bxvlhir");
     
@@ -89,7 +89,7 @@ int main(int argc, char ** argv)
     
     auto ret = interpreter.call_func_by_name("main", {});
     
-    printf("main returned %zd\n", ret.data.integer);
+    printf("main returned %.24f\n", ret.data.real);
     
     //throw ret;
     

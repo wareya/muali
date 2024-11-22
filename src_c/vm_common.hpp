@@ -27,38 +27,63 @@ struct Global {
     ListMap<String, size_t> var_names;
 };
 
-constexpr uint8_t OP_SET              = 0x00;
-constexpr uint8_t OP_SETIMM           = 0x01;
+constexpr uint8_t OPINFO_CMPE         = 0x00;
+constexpr uint8_t OPINFO_CMPNE        = 0x01;
+constexpr uint8_t OPINFO_CMPGT        = 0x02;
+constexpr uint8_t OPINFO_CMPLT        = 0x03;
+constexpr uint8_t OPINFO_CMPGTE       = 0x04;
+constexpr uint8_t OPINFO_CMPLTE       = 0x05;
 
-constexpr uint8_t OP_ADD              = 0x02;
-constexpr uint8_t OP_ADDIMM           = 0x03;
 
-constexpr uint8_t OP_SUB              = 0x04;
-constexpr uint8_t OP_SUBIMM           = 0x05;
+constexpr uint8_t OP_FAULT            = 0x00;
 
-constexpr uint8_t OP_MUL              = 0x06;
-constexpr uint8_t OP_MULIMM           = 0x07;
+constexpr uint8_t OP_SET              = 0x02;
+constexpr uint8_t OP_SETIMM           = 0x03;
 
-constexpr uint8_t OP_DIV              = 0x08;
-constexpr uint8_t OP_DIVIMM           = 0x09;
+constexpr uint8_t OP_ADD              = 0x04;
+constexpr uint8_t OP_ADDIMM           = 0x05;
 
-constexpr uint8_t OP_MOD              = 0x0A;
-constexpr uint8_t OP_MODIMM           = 0x0B;
+constexpr uint8_t OP_SUB              = 0x06;
+constexpr uint8_t OP_SUBIMM           = 0x07;
 
-constexpr uint8_t OP_INCI             = 0x0C;
-constexpr uint8_t OP_DECI             = 0x0D;
+constexpr uint8_t OP_MUL              = 0x08;
+constexpr uint8_t OP_MULIMM           = 0x09;
 
-constexpr uint8_t OP_INCF             = 0x0E;
-constexpr uint8_t OP_DECF             = 0x0F;
+constexpr uint8_t OP_DIV              = 0x0A;
+constexpr uint8_t OP_DIVIMM           = 0x0B;
+
+constexpr uint8_t OP_MOD              = 0x0C;
+constexpr uint8_t OP_MODIMM           = 0x0D;
 
 constexpr uint8_t OP_BITAND           = 0x10;
-constexpr uint8_t OP_BITOR            = 0x11;
-constexpr uint8_t OP_BITXOR           = 0x12;
-constexpr uint8_t OP_SHL              = 0x13;
-constexpr uint8_t OP_SHR              = 0x14;
+constexpr uint8_t OP_BITANDIMM        = 0x11;
+constexpr uint8_t OP_BITOR            = 0x12;
+constexpr uint8_t OP_BITORIMM         = 0x13;
+constexpr uint8_t OP_BITXOR           = 0x14;
+constexpr uint8_t OP_BITXORIMM        = 0x15;
+constexpr uint8_t OP_SHL              = 0x16;
+constexpr uint8_t OP_SHLIMM           = 0x17;
+constexpr uint8_t OP_SHR              = 0x18;
+constexpr uint8_t OP_SHRIMM           = 0x19;
 
 constexpr uint8_t OP_NEGATE           = 0x20;
 constexpr uint8_t OP_NOT              = 0x21;
+constexpr uint8_t OP_BITNOT           = 0x22;
+
+constexpr uint8_t OP_INCI             = 0x24;
+constexpr uint8_t OP_DECI             = 0x25;
+
+constexpr uint8_t OP_INCF             = 0x26;
+constexpr uint8_t OP_DECF             = 0x27;
+
+constexpr uint8_t OP_INC              = 0x28;
+constexpr uint8_t OP_DEC              = 0x29;
+
+constexpr uint8_t OP_DOUBLEF          = 0x2A;
+constexpr uint8_t OP_HALVEF           = 0x2B;
+constexpr uint8_t OP_RECIPF           = 0x2C;
+
+constexpr uint8_t OP_JINCILTIMM       = 0x2F;
 
 constexpr uint8_t OP_CMPI0            = 0x30;
 constexpr uint8_t OP_CMPI1            = 0x31;
@@ -108,27 +133,28 @@ constexpr uint8_t OP_SET_GLOBALIMM    = 0xBA;
 
 constexpr uint8_t OP_SQRT             = 0xC0;
 
-constexpr uint8_t OP_RETURNVAL        = 0xD0;
-constexpr uint8_t OP_RETURNIMM        = 0xD1;
-constexpr uint8_t OP_RETURNNULL       = 0xD2;
+constexpr uint8_t OP_CALL             = 0xD0;
+constexpr uint8_t OP_CALL_INDIRECT    = 0xD1;
+constexpr uint8_t OP_CALLDISCARD      = 0xD2;
+constexpr uint8_t OP_CALLD_INDIRECT   = 0xD3;
 
 constexpr uint8_t OP_J                = 0xD4;
 constexpr uint8_t OP_JIF              = 0xD5;
 constexpr uint8_t OP_JIFNOT           = 0xD6;
-constexpr uint8_t OP_JIFELSE          = 0xD7;
-constexpr uint8_t OP_JIFNOTELSE       = 0xD8;
+constexpr uint8_t OP_JIFNULL          = 0xD7;
+constexpr uint8_t OP_JIFNOTNULL       = 0xD8;
 constexpr uint8_t OP_JCMP             = 0xD9;
+constexpr uint8_t OP_JCMPIMM          = 0xDA;
+constexpr uint8_t OP_JILTIMM          = 0xDB;
 
-constexpr uint8_t OP_CALL             = 0xDA;
-constexpr uint8_t OP_CALL_INDIRECT    = 0xDB;
-constexpr uint8_t OP_CALLDISCARD      = 0xDC;
-constexpr uint8_t OP_CALLD_INDIRECT   = 0xDD;
+constexpr uint8_t OP_RETURNVAL        = 0xDC;
+constexpr uint8_t OP_RETURNIMM        = 0xDD;
+
 constexpr uint8_t OP_BECOME           = 0xDE;
 constexpr uint8_t OP_BECOME_INDIRECT  = 0xDF;
 
 constexpr uint8_t OP_NOOP             = 0xE0;
 constexpr uint8_t OP_EXIT             = 0xEE;
-constexpr uint8_t OP_FAULT            = 0xEF;
 
 // 0xF_ are reserved for extended instructions if i run out of opcode space
 //constexpr uint8_t OP_EXT0             = 0xF0;

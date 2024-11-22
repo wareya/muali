@@ -1,5 +1,16 @@
-func main(a, asdf):
-    var x = 31415
-    var y = -10552
-    return x + y
+func main():
+    var sum = 0.0
+    var flip = -1.0
+    //for (i in 1 to 1000000000):
+    for (i in 1 to 1000000000):
+        //flip *= -1.0
+        flip = -flip
+        //flip = flip * -1.0
+        //sum = 1.0 * i
+        //sum += flip / (2*i - 1)
+        //sum += flip / (i*2 - 1)
+        sum += flip / (i*2.0 - 1.0)
+        //sum += flip / (i<<1 - 1)
+    end
+    return sum * 4.0
 end

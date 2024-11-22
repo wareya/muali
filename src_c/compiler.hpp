@@ -14,6 +14,7 @@ struct ExprInfo {
     Option<int64_t> imm_int;
     Option<double> imm_float;
     Option<String> imm_string;
+    Option<uint8_t> imm_null;
     Option<size_t> global_var;
     Option<size_t> func_name;
     
@@ -31,13 +32,26 @@ struct ExprInfo {
     }
     bool is_immediate()
     {
-        return !!imm_int || !!imm_float || !!imm_string;
+        return !!imm_int || !!imm_float || !!imm_string || !!imm_null;
+    }
+    
+    static ExprInfo of_null()
+    {
+        ExprInfo ret;
+        ret.imm_null = {0};
+        return ret;
     }
     
     static ExprInfo from_int(int64_t n)
     {
         ExprInfo ret;
         ret.imm_int = {n};
+        return ret;
+    }
+    static ExprInfo from_float(double n)
+    {
+        ExprInfo ret;
+        ret.imm_float = {n};
         return ret;
     }
     static ExprInfo from_var_reg(size_t n)
@@ -56,9 +70,19 @@ struct FuncCompInfo {
     size_t next_reg = 0;
     Vec<size_t> freed_registers;
     
+    void push_scope()
+    {
+        scopes.push_back({});
+    }
+    void pop_scope()
+    {
+        scopes.pop_back();
+    }
+    
     size_t add_var(String name)
     {
         size_t _var_index = var_index++;
+        assert(_var_index < vardec_count);
         scopes.back().insert(name, _var_index);
         printf("added var %s\n", name.data());
         return _var_index;
@@ -78,13 +102,17 @@ struct FuncCompInfo {
     {
         if (reg < vardec_count)
             return;
-        freed_registers.push_back(reg);
+        freed_registers.push_back(reg); // FIXME breaks some instruction handlers
     }
     
     size_t alloc_register()
     {
         if (freed_registers.size())
+        {
+            printf("reusing reg %zu\n", freed_registers.back());
             return freed_registers.pop_back();
+        }
+        printf("using new reg %zu\n", next_reg);
         return next_reg++;
     }
 };
@@ -100,6 +128,26 @@ static inline void push_varlen_int(T & buffer, size_t myint)
     buffer.push_back(myint);
 }
 
+template<typename T>
+static inline void push_u32(T & buffer, uint32_t imm)
+{
+    buffer.push_back(imm);
+    buffer.push_back(imm >> 8);
+    buffer.push_back(imm >> 16);
+    buffer.push_back(imm >> 24);
+}
+template<typename T>
+static inline void push_u64(T & buffer, uint64_t imm)
+{
+    buffer.push_back(imm);
+    buffer.push_back(imm >> 8);
+    buffer.push_back(imm >> 16);
+    buffer.push_back(imm >> 24);
+    buffer.push_back(imm >> 32);
+    buffer.push_back(imm >> 40);
+    buffer.push_back(imm >> 48);
+    buffer.push_back(imm >> 56);
+}
 template<typename T>
 static inline void push_immediate(T & buffer, ExprInfo myimm)
 {
@@ -117,14 +165,7 @@ static inline void push_immediate(T & buffer, ExprInfo myimm)
             buffer.push_back(TYPEID_FLOAT);
             memcpy(&imm, &*myimm.imm_float, 8);
         }
-        buffer.push_back(imm);
-        buffer.push_back(imm >> 8);
-        buffer.push_back(imm >> 16);
-        buffer.push_back(imm >> 24);
-        buffer.push_back(imm >> 32);
-        buffer.push_back(imm >> 40);
-        buffer.push_back(imm >> 48);
-        buffer.push_back(imm >> 56);
+        push_u64(buffer, imm);
     }
     else
         assert(((void)"TODO string immediate", 0));
@@ -133,7 +174,7 @@ static inline void push_immediate(T & buffer, ExprInfo myimm)
 static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<Function> func, FuncCompInfo & info, const Global & global)
 {
     assert(node->text);
-    printf("%s\n", node->text->data());
+    //printf("%s\n", node->text->data());
     if (*node->text == "funcdef")
     {
         //for (auto _node : node->children[1]->children.size())
@@ -169,6 +210,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 func->code.push_back(OP_SET);
                 push_varlen_int(func->code, var_index);
                 push_varlen_int(func->code, *expr.var_reg);
+                printf("!!! emitting declaration assignment with %zu...\n", *expr.var_reg);
             }
             else
                 assert(((void)"TODO", 0));
@@ -183,7 +225,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         auto expr = *_expr;
         
         // TODO support globals
-        size_t var_index = info.look_up(*node->children[0]->text);
+        size_t var_index = info.look_up(*node->children[0]->children[0]->text);
         if (var_index == -1ULL)
         {
             printf("failed to find variable %s\n", node->children[0]->text->data());
@@ -200,6 +242,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         {
             func->code.push_back(OP_SET);
             push_varlen_int(func->code, var_index);
+            printf("!!! emitting normal assignment with %zu...\n", *expr.var_reg);
             push_varlen_int(func->code, *expr.var_reg);
         }
         else
@@ -214,6 +257,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             printf("failed to find variable %s\n", node->children[0]->text->data());
             throw;
         }
+        printf("looked up %s.... found at %zu!!!\n", node->children[0]->text->data(), var_index);
         return {ExprInfo::from_var_reg(var_index)};
     }
     else if (node->text->starts_with("base_unexp"))
@@ -222,7 +266,6 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             return compile_func_inner(node->children[0], func, info, global);
         else
         {
-            auto ret = compile_func_inner(node->children[0], func, info, global);
             assert(((void)"TODO (base unexp)", 0));
         }
     }
@@ -232,8 +275,37 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             return compile_func_inner(node->children[0], func, info, global);
         else
         {
-            auto ret = compile_func_inner(node->children[0], func, info, global);
-            assert(((void)"TODO (base binexp)", 0));
+            auto ret = compile_func_inner(node->children.back(), func, info, global);
+            auto & text = node->children[0]->children[0]->text;
+            if (!!ret->imm_int || !!ret->imm_float)
+            {
+                if (*text == "+")
+                    return ret;
+                else if (*text == "-")
+                {
+                    if (ret->imm_int)
+                        *ret->imm_int = -*ret->imm_int;
+                    else
+                        *ret->imm_float = -*ret->imm_float;
+                    return ret;
+                }
+                else
+                    assert(0);
+            }
+            else
+            {
+                if (*text == "+")
+                    return ret; // FIXME: check that the type is int, float, or bool
+                else if (*text == "-")
+                {
+                    assert(ret->is_var_reg());
+                    func->code.push_back(OP_NEGATE);
+                    push_varlen_int(func->code, *ret->var_reg);
+                    return ret;
+                }
+                else
+                    assert(0);
+            }
         }
     }
     else if (node->text->starts_with("binexp_"))
@@ -245,11 +317,18 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             auto _expr1 = compile_func_inner(node->children[0], func, info, global);
             assert(_expr1);
             auto expr1 = *_expr1;
-            assert(((void)"TODO", expr1.is_var_reg()));
+            
+            //assert(((void)"TODO", expr1.is_var_reg()));
             
             auto _expr2 = compile_func_inner(node->children[2], func, info, global);
             assert(_expr2);
             auto expr2 = *_expr2;
+            
+            // TODO: constant folding
+            //if (expr1.is_immediate() && expr2.is_immediate())
+            //{
+            //    // ...
+            //}
             
             auto & op = *node->children[1]->children[0]->text;
             
@@ -259,39 +338,123 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 op_byte = OP_ADD;
             else if (op == "+" && expr2.is_immediate())
                 op_byte = OP_ADDIMM;
+            else if (op == "-" && !expr2.is_immediate())
+                op_byte = OP_SUB;
+            else if (op == "-" && expr2.is_immediate())
+                op_byte = OP_SUBIMM;
+            else if (op == "*" && !expr2.is_immediate())
+                op_byte = OP_MUL;
+            else if (op == "*" && expr2.is_immediate())
+                op_byte = OP_MULIMM;
+            else if (op == "/" && !expr2.is_immediate())
+                op_byte = OP_DIV;
+            else if (op == "/" && expr2.is_immediate())
+                op_byte = OP_DIVIMM;
+            else if (op == "<<" && !expr2.is_immediate())
+                op_byte = OP_SHL;
+            else if (op == "<<" && expr2.is_immediate())
+                op_byte = OP_SHLIMM;
+            else if (op == ">>" && !expr2.is_immediate())
+                op_byte = OP_SHR;
+            else if (op == ">>" && expr2.is_immediate())
+                op_byte = OP_SHRIMM;
             else
                 assert(((void)"TODO (binexp)", 0));
             
-            puts("a");
-            
             if (expr1.is_var_reg())
                 info.free_register(*expr1.var_reg); // does nothing if passed a variable
-            if (expr2.is_var_reg())
-                info.free_register(*expr2.var_reg);
-            
-            puts("b");
             
             size_t out_reg = info.alloc_register();
             
-            puts("c");
+            if (!expr1.is_var_reg())
+            {
+                if (expr1.is_immediate())
+                {
+                    func->code.push_back(OP_SETIMM);
+                    push_varlen_int(func->code, out_reg);
+                    push_immediate(func->code, expr1);
+                    expr1 = ExprInfo::from_var_reg(out_reg);
+                }
+                else
+                    assert(((void)"tried to multiply with an unsupported type", 0));
+            }
+            
             func->code.push_back(op_byte);
             push_varlen_int(func->code, out_reg);
-            puts("d");
             push_varlen_int(func->code, *expr1.var_reg);
-            puts("e");
+            
             if (expr2.is_var_reg())
                 push_varlen_int(func->code, *expr2.var_reg);
-            else
+            else if (expr2.is_immediate())
                 push_immediate(func->code, expr2);
-            puts("f");
+            else
+                assert(((void)"TODO (binexp non-var/imm case)", 0));
             
-            return {ExprInfo::from_var_reg(op_byte)};
+            if (expr2.is_var_reg())
+                info.free_register(*expr2.var_reg);
+            
+            return {ExprInfo::from_var_reg(out_reg)};
         }
+    }
+    else if (*node->text == "assign_binop")
+    {
+        // TODO support globals
+        size_t var_index = info.look_up(*node->children[0]->children[0]->text);
+        
+        auto _expr2 = compile_func_inner(node->children[2], func, info, global);
+        assert(_expr2);
+        auto expr2 = *_expr2;
+        
+        // TODO: constant folding
+        //if (expr1.is_immediate() && expr2.is_immediate())
+        //{
+        //    // ...
+        //}
+        
+        auto & op = *node->children[1]->children[0]->text;
+        
+        printf("%s\n", op.data());
+        uint8_t op_byte;
+        if (op == "+=" && !expr2.is_immediate())
+            op_byte = OP_ADD;
+        else if (op == "+=" && expr2.is_immediate())
+            op_byte = OP_ADDIMM;
+        else if (op == "-=" && !expr2.is_immediate())
+            op_byte = OP_SUB;
+        else if (op == "-=" && expr2.is_immediate())
+            op_byte = OP_SUBIMM;
+        else if (op == "*=" && !expr2.is_immediate())
+            op_byte = OP_MUL;
+        else if (op == "*=" && expr2.is_immediate())
+            op_byte = OP_MULIMM;
+        else if (op == "/=" && !expr2.is_immediate())
+            op_byte = OP_DIV;
+        else if (op == "/=" && expr2.is_immediate())
+            op_byte = OP_DIVIMM;
+        else
+            assert(((void)"TODO (binexp)", 0));
+        
+        func->code.push_back(op_byte);
+        push_varlen_int(func->code, var_index);
+        push_varlen_int(func->code, var_index);
+        
+        if (expr2.is_var_reg())
+            push_varlen_int(func->code, *expr2.var_reg);
+        else if (expr2.is_immediate())
+            push_immediate(func->code, expr2);
+        else
+            assert(((void)"TODO (binexp non-var/imm case)", 0));
+        
+        if (expr2.is_var_reg())
+            info.free_register(*expr2.var_reg);
     }
     else if (node->text->starts_with("return"))
     {
         if (node->children.size() == 0)
-            func->code.push_back(OP_RETURNNULL);
+        {
+            func->code.push_back(OP_RETURNIMM);
+            push_immediate(func->code, ExprInfo::of_null());
+        }
         else
         {
             auto _expr = compile_func_inner(node->children[0], func, info, global);
@@ -323,6 +486,86 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         //assert(((void)"TODO", 0));
         return {ExprInfo::from_int(n)};
     }
+    else if (*node->text == "float")
+    {
+        double n = strtod(node->children[0]->text->data(), 0);
+        //assert(((void)"TODO", 0));
+        return {ExprInfo::from_float(n)};
+    }
+    else if (*node->text == "block" || *node->text == "simple_block")
+    {
+        info.push_scope();
+        for (auto node : node->children)
+            compile_func_inner(node, func, info, global);
+        info.pop_scope();
+    }
+    else if (*node->text == "foreach")
+    {
+        info.push_scope();
+        
+        size_t var_index = info.add_var(*node->children[0]->children[0]->text);
+        size_t n = 1;
+        if (node->children.size() == 4)
+            n = 2;
+        
+        auto _expr = compile_func_inner(node->children[n], func, info, global);
+        assert(_expr);
+        auto expr = *_expr;
+        
+        if (expr.imm_int)
+        {
+            if (node->children.size() == 4)
+            {
+                auto _expr = compile_func_inner(node->children[1], func, info, global);
+                assert(_expr);
+                auto expr = *_expr;
+                *expr.imm_int -= 1;
+                func->code.push_back(OP_SETIMM);
+                push_varlen_int(func->code, var_index);
+                push_immediate(func->code, expr);
+            }
+            else
+            {
+                func->code.push_back(OP_SETZEROI);
+                push_varlen_int(func->code, var_index);
+                func->code.push_back(OP_DECI);
+                push_varlen_int(func->code, var_index);
+            }
+            
+            func->code.push_back(OP_J);
+            size_t offset_pos = func->code.size();
+            push_u32(func->code, 0);
+            
+            compile_func_inner(node->children.back(), func, info, global);
+            
+            //func->code.push_back(OP_INCI);
+            //func->code.push_back(var_index);
+            
+            int64_t diff = (ptrdiff_t)func->code.size() - (ptrdiff_t)(offset_pos + 4);
+            assert(diff >= -2147483647 && diff <= 2147483647);
+            int32_t diff32 = diff;
+            memcpy(func->code.data() + offset_pos, &diff32, 4);
+            
+            func->code.push_back(OP_JINCILTIMM);
+            push_varlen_int(func->code, var_index);
+            push_u64(func->code, *expr.imm_int);
+            push_u32(func->code, (ptrdiff_t)offset_pos - (ptrdiff_t)func->code.size());
+        }
+        else
+        {
+            //size_t expr_var_index = info.add_var("");
+            
+            func->code.push_back(OP_SETIMM);
+            push_varlen_int(func->code, var_index);
+            push_immediate(func->code, expr);
+            
+            assert(((void)"TODO non-immediate-integer foreach", 0));
+        }
+        
+        //assert(((void)"TODO", 0));
+        info.pop_scope();
+        //assert(((void)"TODO", 0));
+    }
     else
     {
         if (node->text)
@@ -338,6 +581,9 @@ static inline void count_vardecs(Shared<ASTNode> node, size_t * vardecs)
 {
     if (node->text && *node->text == "vardec")
         *vardecs += 1;
+    else if (node->text && *node->text == "foreach")
+        *vardecs += 1;
+        //*vardecs += 2;
     
     for (auto node : node->children)
         count_vardecs(node, vardecs);

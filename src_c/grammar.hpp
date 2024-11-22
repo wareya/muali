@@ -64,6 +64,7 @@ struct GrammarPoint {
     Vec<GrammarForm> forms;
     bool left_recursive = false;
     bool no_tokens = false;
+    bool flatten = false;
     GrammarPoint()
     {
         forms.push_back(GrammarForm{});
@@ -93,13 +94,14 @@ static Shared<MatchingRule> new_rule_text(String text)
 
 struct Grammar
 {
+    ListSet<Shared<GrammarPoint>> all_points;
     ListMap<String, Shared<GrammarPoint>> points;
     Vec<Shared<MatchingRule>> tokens;
     Vec<Shared<MatchingRule>> regex_tokens;
     ~Grammar()
     {
         // kill inter-point references to prevent reference cycle memory leaks
-        for (auto & [_, point] : points)
+        for (auto & point : all_points)
         {
             for (auto & form : point->forms)
             {
@@ -203,6 +205,7 @@ static auto load_grammar(const char * text) -> Grammar
     };
     
     auto current_point = MakeShared<GrammarPoint>();
+    all_points.insert(current_point);
     
     while (i < len)
     {
@@ -211,8 +214,8 @@ static auto load_grammar(const char * text) -> Grammar
             if (current_point->name)
             {
                 ret.insert(*current_point->name, current_point);
-                all_points.insert(current_point);
                 current_point = MakeShared<GrammarPoint>();
+                all_points.insert(current_point);
             }
             mode = MODE_NAME;
             go_to_next_line();
@@ -233,9 +236,24 @@ static auto load_grammar(const char * text) -> Grammar
             while (text[i] != 0 && (text[i] == ' ' || text[i] == '\t'))
                 i++;
             if (starts_with(&text[i], "@left_recursive"))
+            {
                 current_point->left_recursive = true;
+                i += 15;
+            }
+            while (text[i] != 0 && (text[i] == ' ' || text[i] == '\t'))
+                i++;
             if (starts_with(&text[i], "@notokens"))
+            {
                 current_point->no_tokens = true;
+                i += 9;
+            }
+            while (text[i] != 0 && (text[i] == ' ' || text[i] == '\t'))
+                i++;
+            if (starts_with(&text[i], "@flatten"))
+            {
+                current_point->flatten = true;
+                i += 8;
+            }
             
             current_point->name = MakeShared<String>(name);
             mode = MODE_FORMS;
@@ -333,13 +351,13 @@ static auto load_grammar(const char * text) -> Grammar
                 {
                     point_stack.push_back(current_point);
                     current_point = MakeShared<GrammarPoint>();
+                    all_points.insert(current_point);
                     i += 1;
                 }
                 else if (text[i] == ')')
                 {
                     current_point->forms.push_back(GrammarForm{}); // dummy to match full-fledged forms in having a dummy at the end
                     auto rule = new_rule_point(current_point);
-                    all_points.insert(current_point);
                     if (point_stack.size() == 0) throw;
                     current_point = point_stack.back();
                     point_stack.pop_back();
@@ -403,7 +421,6 @@ static auto load_grammar(const char * text) -> Grammar
     if (current_point->name)
     {
         ret.insert(*current_point->name, current_point);
-        all_points.insert(current_point);
     }
     
     //std::sort(tokens.begin(), tokens.end(), [](Shared<MatchingRule> a, Shared<MatchingRule> b)
@@ -470,7 +487,7 @@ static auto load_grammar(const char * text) -> Grammar
         }
     }
     
-    return {ret, tokens, regex_tokens};
+    return {all_points, ret, tokens, regex_tokens};
 }
 
 struct Token {
@@ -640,13 +657,13 @@ static inline void print_AST(Shared<ASTNode> node, size_t depth)
     if (node->children.size() > 0)
     {
         indent();
-        printf("@+\n");
+        printf("{.\n");
         for (auto c : node->children)
         {
             print_AST(c, depth + 1);
         }
         indent();
-        printf("@-\n");
+        printf("}.\n");
     }
 }
 static inline void print_AST(Shared<ASTNode> node)
@@ -654,8 +671,31 @@ static inline void print_AST(Shared<ASTNode> node)
     print_AST(node, 0);
 }
 
+static inline void AST_fixup(Shared<ASTNode> node)
+{
+    for (auto & c : node->children)
+        AST_fixup(c);
+    for (auto & c : node->children)
+    {
+        while (c->rule && c->rule->rule && c->rule->rule->flatten && c->children.size() == 1)
+            c = std::move(c->children[0]);
+    }
+    for (auto & c : node->children)
+    {
+        while (c && c->rule && c->rule->rule && c->rule->rule->left_recursive && c->children.size() == 3 && c->children[2]->rule && c->children[2]->rule->rule && c->children[2]->rule->rule == c->rule->rule)
+        {
+            auto temp = std::move(c);
+            c = std::move(temp->children[2]);
+            temp->children[2] = std::move(c->children[0]);
+            c->children[0] = std::move(temp);
+        }
+    }
+}
+
 static inline void AST_delete_token_refs(Shared<ASTNode> node)
 {
+    if (node->rule)
+        node->rule->rule = 0;
     node->rule = 0;
     for (auto c : node->children)
         AST_delete_token_refs(c);
@@ -947,7 +987,7 @@ static auto parse_with(const Vec<Shared<Token>> & tokens, size_t starting_token_
             }
             if (node_type->left_recursive && ret.children.size() > 1)
             {
-                printf("\033[91mWARNING: HAVE NOT IMPLEMENTED LEFT-RECURSION ROTATION YET.\033[0m\n");
+                //printf("\033[91mWARNING: HAVE NOT IMPLEMENTED LEFT-RECURSION ROTATION YET.\033[0m\n");
                 //assert(((void)"TODO", 0));
             }
             
@@ -977,7 +1017,11 @@ static auto parse_as(Grammar & grammar, const Vec<Shared<Token>> & tokens, const
     if (ret && (*ret)->token_count != tokens.size())
         ret = {};
     else if (ret)
+    {
+        AST_fixup(*ret);
         AST_delete_token_refs(*ret);
+    }
+    puts("we");
     clear_parser_global_state();
     return ret;
 }

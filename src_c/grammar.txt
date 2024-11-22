@@ -1,9 +1,9 @@
 int:
-rx%[-+]?[0-9]+%rx
+rx%[0-9]+%rx
 
 float:
-rx%[-+]?[0-9]*\.[0-9]+%rx
-rx%[-+]?[0-9]+\.[0-9]*%rx
+rx%[0-9]*\.[0-9]+%rx
+rx%[0-9]+\.[0-9]*%rx
 
 string:
 rx%"(?:[^\\"]|\\.)*"%rx
@@ -14,7 +14,7 @@ rx%[a-zA-Z_][a-zA-Z_0-9]*%rx
 null:
 "null"
 
-simple_expr: @notokens
+simple_expr: @notokens @flatten
 "(" expr ")"
 int | float | string | null | name
 
@@ -32,28 +32,28 @@ funccall
 index
 dismember
 
-base_unexp:
+base_unexp: @flatten
 simple_expr expr_tail_0*
 
 funccall_statement:
 simple_expr expr_tail_0* funccall
 
-base_binexp:
+base_binexp: @flatten
 ("-"|"+")? base_unexp
 
-binexp_3: @left_recursive
-base_binexp ("*"|"/"|"%"|"<<"|">>") binexp_0
+binexp_3: @left_recursive @flatten
+base_binexp ("*"|"/"|"%"|"<<"|">>") binexp_3
 base_binexp
 
-binexp_2: @left_recursive
-binexp_3 ("+"|"-"|"&"|"|"|"^") binexp_0
+binexp_2: @left_recursive @flatten
+binexp_3 ("+"|"-"|"&"|"|"|"^") binexp_2
 binexp_3
 
-binexp_1: @left_recursive
-binexp_2 ("=="|"!="|">="|"<="|">"|"<") binexp_0
+binexp_1: @left_recursive @flatten
+binexp_2 ("=="|"!="|">="|"<="|">"|"<") binexp_1
 binexp_2
 
-binexp_0: @left_recursive
+binexp_0: @left_recursive @flatten
 binexp_1 ("and"|"or") binexp_0
 binexp_1
 
@@ -98,6 +98,14 @@ while: @notokens
 while_short: @notokens
 "while" "(" expr ")" simple_block
 
+foreach: @notokens
+"for" "(" name "in" int "to" int ")" ":" block "end"
+"for" "(" name "in" expr ")" ":" block "end"
+
+foreach_short: @notokens
+"for" "(" name "in" int "to" int ")" simple_block
+"for" "(" name "in" expr ")" simple_block
+
 return: @notokens
 "return" expr?
 
@@ -107,11 +115,14 @@ pass: @notokens
 assign: @notokens
 name "=" expr
 
+assign_binop:
+name ("+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "^=" | "<<=" | ">>=") expr
+
 statement: @notokens
-(if | if_short | while | while_short | vardec | assign | funccall_statement | return | pass) ";"?
+(if | if_short | while | while_short | foreach | foreach_short | vardec | assign | assign_binop | funccall_statement | return | pass) ";"?
 
 simple_statement: @notokens
-(vardec | assign | funccall_statement | return | pass) ";"?
+(vardec | assign | assign_binop | funccall_statement | return | pass) ";"?
 
 simple_block: @notokens
 simple_statement
