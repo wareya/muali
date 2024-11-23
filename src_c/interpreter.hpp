@@ -16,7 +16,6 @@
 //#define OPHANDLER_ABI
 
 #define USE_EXTRA_ASSERTS
-#define INSANELY_UNSAFE_DISABLE_VARLEN_VARREG_ENCODING
 //#define NO_THROW_ALL_DANGER_LETS_GO
 #define DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
 
@@ -28,6 +27,12 @@
 //#define ASSERT_THROW(X) { if (!(X)) throw; }
 //#define ASSERT_THROW(X) { if (!(X)) throw #X; }
 //#define ASSERT_THROW(X) { assert(X); }
+#endif
+
+#ifdef OPCODES_ALWAYS_16BIT
+#define INC_PC_FOR_OPCODE(X) pc += 2;
+#else
+#define INC_PC_FOR_OPCODE(X) pc += ((X) > 0xFF) ? 2 : 1;
 #endif
 
 struct Variable {
@@ -192,6 +197,9 @@ struct Variable {
 
 extern "C" uint16_t read_op(const uint8_t * & pc)
 {
+#ifdef OPCODES_ALWAYS_8BIT
+    return *pc;
+#else
     uint16_t c;
     memcpy(&c, pc, 2);
     c &= (1<<INTERPRETER_OPCODE_TABLE_BITS) - 1;
@@ -200,6 +208,7 @@ extern "C" uint16_t read_op(const uint8_t * & pc)
         //return *pc++;
     //pc += 2;
     return c;
+#endif
 }
 
 
@@ -372,6 +381,7 @@ constexpr OpTable make_opcode_table()
     table.t[OP_JINCILT] = op_jincilt;
     table.t[OP_NEGATE] = op_negate;
     
+#ifndef OPCODES_ALWAYS_16BIT
     for (uint16_t n = 0; n < 256; n++)
     {
         if (table.t[n] != op_unk)
@@ -382,6 +392,7 @@ constexpr OpTable make_opcode_table()
             }
         }
     }
+#endif
     
     return table;
 }
@@ -410,7 +421,7 @@ struct Interpreter {
 
 OPHANDLER_ABI void op_unk(OPHANDLER_ARGS)
 {
-    //pc += (OP_UNK > 0xFF) ? 2 : 1;
+    //INC_PC_FOR_OPCODE(OP_UNK);
     (void)vars;
     (void)global;
     printf("unknown instruction %02X -- breaking!\n", *(pc-1));
@@ -446,25 +457,42 @@ Variable read_immediate(const uint8_t * & pc)
 
 OPHANDLER_ABI size_t read_varlen_int(const uint8_t * & pc)
 {
-#ifndef INSANELY_UNSAFE_DISABLE_VARLEN_VARREG_ENCODING
-    //size_t ret = 0;
-    //while (1)
-    //{
-    //    ret += *pc++;
-    //    if (pc[-1] != 255)
-    //        return ret;
-    //}
-    
-    //size_t ret = 0;
-    //do { ret += *pc++; } while (pc[-1] == 255);
-    
-    size_t ret = *pc++;
-    while (pc[-1] == 255)
-        ret += *pc++;
+#ifdef VARLEN_VARREG_16BIT
+    uint16_t ret;
+    memcpy(&ret, pc, 2);
+    pc += 2;
     return ret;
 #else
+#ifndef VARLEN_VARREG_8BIT
+    size_t ret = *pc++;
+#ifdef VARLEN_VARREG_LZ4LIKE
+    if (pc[-1] == 0xFF) [[unlikely]]
+    {
+        while (pc[-1] == 0xFF)
+            ret += *pc++;
+    }
+#else
+    if (pc[-1] & 0x80) [[unlikely]]
+    {
+        ret &= 0x7F;
+    #ifdef VARLEN_VARREG_LEB128
+        size_t shift = 7;
+        while (pc[-1] & 0x80)
+        {
+            ret |= (*pc++ & 0x7F) << shift;
+            shift += 7;
+        }
+    #else
+        while (pc[-1] & 0x80)
+            ret = (ret << 7) | (*pc++ & 0x7F);
+    #endif
+    }
+#endif // VARLEN_VARREG_LZ4LIKE
+    return ret;
+#else // 8-bit
     return *pc++;
-#endif
+#endif // else of 8-bit
+#endif // else of 16-bit
 }
 static inline uint8_t read_u8(const uint8_t * & pc)
 {
@@ -497,7 +525,7 @@ static inline uint64_t read_u64(const uint8_t * & pc)
 
 OPHANDLER_ABI void op_j(OPHANDLER_ARGS)
 {
-    pc += (OP_J > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_J);
     {
         int32_t offset = read_u32(pc);
         pc += offset;
@@ -507,7 +535,7 @@ OPHANDLER_ABI void op_j(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_jiltimm(OPHANDLER_ARGS)
 {
-    pc += (OP_JILTIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_JILTIMM);
     {
         auto index = read_varlen_int(pc);
         int64_t imm = read_u64(pc);
@@ -523,7 +551,7 @@ OPHANDLER_ABI void op_jiltimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_inci(OPHANDLER_ARGS)
 {
-    pc += (OP_INCI > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_INCI);
     {
         auto index = read_varlen_int(pc);
         ASSERT_THROW(vars[index].kind == TYPEID_INT);
@@ -533,7 +561,7 @@ OPHANDLER_ABI void op_inci(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_deci(OPHANDLER_ARGS)
 {
-    pc += (OP_DECI > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_DECI);
     {
         auto index = read_varlen_int(pc);
         ASSERT_THROW(vars[index].kind == TYPEID_INT);
@@ -544,7 +572,7 @@ OPHANDLER_ABI void op_deci(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
 {
-    pc += (OP_JINCILTIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_JINCILTIMM);
     {
         auto index = read_varlen_int(pc);
         
@@ -567,7 +595,7 @@ OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_jincilt(OPHANDLER_ARGS)
 {
-    pc += (OP_JINCILT > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_JINCILT);
     {
         auto index = read_varlen_int(pc);
         auto i_index = read_varlen_int(pc);
@@ -587,7 +615,7 @@ OPHANDLER_ABI void op_jincilt(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_negate(OPHANDLER_ARGS)
 {
-    pc += (OP_NEGATE > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_NEGATE);
     {
         auto index = read_varlen_int(pc);
         auto & var = vars[index];
@@ -608,7 +636,7 @@ OPHANDLER_ABI void op_negate(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_setimm(OPHANDLER_ARGS)
 {
-    pc += (OP_SETIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SETIMM);
     {
         auto index = read_varlen_int(pc);
         auto var = read_immediate(pc);
@@ -618,7 +646,7 @@ OPHANDLER_ABI void op_setimm(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_set(OPHANDLER_ARGS)
 {
-    pc += (OP_SET > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SET);
     {
         auto index = read_varlen_int(pc);
         auto varindex = read_varlen_int(pc);
@@ -630,7 +658,7 @@ OPHANDLER_ABI void op_set(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_setzeroi(OPHANDLER_ARGS)
 {
-    pc += (OP_SETZEROI > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SETZEROI);
     {
         auto index = read_varlen_int(pc);
         vars[index] = Variable::of_type(TYPEID_INT);
@@ -641,7 +669,7 @@ OPHANDLER_ABI void op_setzeroi(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_add(OPHANDLER_ARGS)
 {
-    pc += (OP_ADD > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_ADD);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -676,7 +704,7 @@ OPHANDLER_ABI void op_add(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_addimm(OPHANDLER_ARGS)
 {
-    pc += (OP_ADDIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_ADDIMM);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -711,7 +739,7 @@ OPHANDLER_ABI void op_addimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_sub(OPHANDLER_ARGS)
 {
-    pc += (OP_SUB > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SUB);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -746,7 +774,7 @@ OPHANDLER_ABI void op_sub(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_subimm(OPHANDLER_ARGS)
 {
-    pc += (OP_SUBIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SUBIMM);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -782,7 +810,7 @@ OPHANDLER_ABI void op_subimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_mul(OPHANDLER_ARGS)
 {
-    pc += (OP_MUL > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_MUL);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -817,7 +845,7 @@ OPHANDLER_ABI void op_mul(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_mulimm(OPHANDLER_ARGS)
 {
-    pc += (OP_MULIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_MULIMM);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -852,7 +880,7 @@ OPHANDLER_ABI void op_mulimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_div(OPHANDLER_ARGS)
 {
-    pc += (OP_DIV > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_DIV);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -888,7 +916,7 @@ OPHANDLER_ABI void op_div(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_divimm(OPHANDLER_ARGS)
 {
-    pc += (OP_DIVIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_DIVIMM);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -925,7 +953,7 @@ OPHANDLER_ABI void op_divimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_shl(OPHANDLER_ARGS)
 {
-    pc += (OP_SHL > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SHL);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -941,7 +969,7 @@ OPHANDLER_ABI void op_shl(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_shlimm(OPHANDLER_ARGS)
 {
-    pc += (OP_SHLIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SHLIMM);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -958,7 +986,7 @@ OPHANDLER_ABI void op_shlimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_shr(OPHANDLER_ARGS)
 {
-    pc += (OP_SHR > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SHR);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -974,7 +1002,7 @@ OPHANDLER_ABI void op_shr(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_shrimm(OPHANDLER_ARGS)
 {
-    pc += (OP_SHRIMM > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_SHRIMM);
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -990,7 +1018,7 @@ OPHANDLER_ABI void op_shrimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_returnval(OPHANDLER_ARGS)
 {
-    pc += (OP_RETURNVAL > 0xFF) ? 2 : 1;
+    INC_PC_FOR_OPCODE(OP_RETURNVAL);
     {
         auto i = read_varlen_int(pc);
         auto & ret = vars[i];

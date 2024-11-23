@@ -1,7 +1,27 @@
 #ifndef MUALI_VM_COMMON
 #define MUALI_VM_COMMON
 
-#define INTERPRETER_OPCODE_TABLE_BITS 16
+//#define OPCODES_ALWAYS_8BIT
+//#define OPCODES_ALWAYS_16BIT
+// var length if neither defined
+// fastest is 8-bit; second-fastest is var length (for some reason...)
+
+#ifdef OPCODES_ALWAYS_8BIT
+#define INTERPRETER_OPCODE_TABLE_BITS 8
+#else
+#define INTERPRETER_OPCODE_TABLE_BITS 16 // tune: can be from 12 to 16 (inclusive).
+#endif
+
+//#define VARLEN_VARREG_16BIT
+//#define VARLEN_VARREG_8BIT // fastest
+// var length if neither defined
+
+// The following defines only affect var-reg operand encoding and not opcode encoding.
+//#define VARLEN_VARREG_LEB128
+// LEB128 is little-endian var length int. otherwise VLQ, which is big endian. VLQ decodes faster, so this should be left disabled.
+//#define VARLEN_VARREG_LZ4LIKE
+// The LZ4 compression algorithm uses a very silly unary-like variable length integer scheme for match lengths.
+// This format can be turned on here. It's slow and big, don't use it.
 
 typedef uint32_t TypeId;
 
@@ -38,24 +58,23 @@ constexpr uint8_t OPINFO_CMPLTE       = 0x05;
 
 
 // giving these high indexes for testing
-constexpr uint16_t OP_SET              = 0xF02;
-constexpr uint16_t OP_SETIMM           = 0xF03;
+constexpr uint16_t OP_SET              = 0x802;
+constexpr uint16_t OP_SETIMM           = 0x803;
 
-constexpr uint16_t OP_SQRT             = 0xF40;
-constexpr uint16_t OP_EXIT             = 0xF42;
-
-constexpr uint16_t OP_JINCILT          = 0xF2E;
-constexpr uint16_t OP_JINCILTIMM       = 0xF2F;
-
-constexpr uint16_t OP_TOSTRING         = 0xF70;
-constexpr uint16_t OP_TOINT            = 0xF71;
-constexpr uint16_t OP_TOFLOAT          = 0xF72;
-constexpr uint16_t OP_FTOIBITS         = 0xF73;
-constexpr uint16_t OP_ITOFBITS         = 0xF74;
+constexpr uint16_t OP_JINCILT          = 0xD0E;
+constexpr uint16_t OP_JINCILTIMM       = 0xD0F;
 
 
-constexpr uint16_t OP_FAULT            = 0xF0;
+constexpr uint16_t OP_SQRT             = 0xF00;
+constexpr uint16_t OP_EXIT             = 0xF02;
 
+constexpr uint16_t OP_TOSTRING         = 0xF00;
+constexpr uint16_t OP_TOINT            = 0xF01;
+constexpr uint16_t OP_TOFLOAT          = 0xF02;
+constexpr uint16_t OP_FTOIBITS         = 0xF03;
+constexpr uint16_t OP_ITOFBITS         = 0xF04;
+
+constexpr uint16_t OP_FAULT            = 0xFF;
 
 constexpr uint16_t OP_ADD              = 0x84;
 constexpr uint16_t OP_ADDIMM           = 0x85;

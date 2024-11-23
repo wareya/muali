@@ -122,6 +122,14 @@ struct FuncCompInfo {
 template<typename T>
 static inline void push_op(T & buffer, uint16_t op)
 {
+#ifdef OPCODES_ALWAYS_8BIT
+    assert(op <= 0xFF);
+    buffer.push_back(uint8_t(op));
+#else
+#ifdef OPCODES_ALWAYS_16BIT
+    buffer.push_back(op);
+    buffer.push_back(op >> 8);
+#else
     assert(op >= 0x80);
     assert((uint32_t)op < (1<<INTERPRETER_OPCODE_TABLE_BITS));
     if (op > 0xFF)
@@ -132,17 +140,45 @@ static inline void push_op(T & buffer, uint16_t op)
     }
     else
         buffer.push_back(uint8_t(op));
+#endif
+#endif
 }
 
 template<typename T>
 static inline void push_varlen_int(T & buffer, size_t myint)
 {
+#ifdef VARLEN_VARREG_8BIT
+    assert(myint <= 255);
+#endif
+#ifdef VARLEN_VARREG_16BIT
+    assert(myint < (1<<16));
+    buffer.push_back(myint);
+    buffer.push_back(myint >> 8);
+#else
+    
+#ifdef VARLEN_VARREG_LZ4LIKE
     while (myint >= 255)
     {
         myint -= 255;
         buffer.push_back(255);
     }
     buffer.push_back(myint);
+#else // VARLEN_VARREG_LZ4LIKE
+    size_t where = buffer.size();
+    buffer.push_back(myint & 0x7F);
+    while (myint >= 0x80)
+    {
+        myint >>= 7;
+    #ifdef VARLEN_VARREG_LEB128
+        (void)where;
+        buffer.back() |= 0x80;
+        buffer.push_back(myint & 0x7F);
+    #else
+        buffer.insert_at(where, (myint & 0x7F) | 0x80);
+    #endif
+    }
+#endif // VARLEN_VARREG_LZ4LIKE
+#endif
 }
 
 template<typename T>
