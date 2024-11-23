@@ -12,8 +12,8 @@
 
 int main(int argc, char ** argv)
 {
-    (void)argc;
-    (void)argv;
+    if (argc < 2)
+        return puts("usage: muali <file>.mua"), 0;
     
     auto f = fopen("src_c/grammar.txt", "rb");
     assert(f);
@@ -23,7 +23,7 @@ int main(int argc, char ** argv)
         text.push_back(c);
     text.push_back(0);
     
-    auto f2 = fopen("test.mua", "rb");
+    auto f2 = fopen(argv[1], "rb");
     assert(f2);
     Vec<char> text2;
     while ((c = fgetc(f2)) >= 0)
