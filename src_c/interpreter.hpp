@@ -10,8 +10,8 @@
 #include "vm_common.hpp"
 
 
-//#define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
-#define OPHANDLER_ABI extern "C"
+#define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
+//#define OPHANDLER_ABI extern "C"
 //#define OPHANDLER_ABI [[clang::preserve_none]]
 //#define OPHANDLER_ABI
 
