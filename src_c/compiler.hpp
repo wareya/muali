@@ -437,22 +437,6 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             else
                 assert(((void)"TODO (binexp)", 0));
             
-            if (expr1.is_var_reg() && expr2.imm_int)
-            {
-                if (op == "-" && *expr2.imm_int == 1)
-                {
-                    push_op(func->code, OP_DECI);
-                    push_varlen_int(func->code, *expr1.var_reg);
-                    return expr1;
-                }
-                if (op == "+" && *expr2.imm_int == 1)
-                {
-                    push_op(func->code, OP_INCI);
-                    push_varlen_int(func->code, *expr1.var_reg);
-                    return expr1;
-                }
-            }
-            
             if (expr1.is_var_reg())
                 info.free_register(*expr1.var_reg); // does nothing if passed a variable
             
@@ -475,6 +459,22 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 push_op(func->code, OP_SET);
                 push_varlen_int(func->code, out_reg);
                 push_varlen_int(func->code, *expr1.var_reg);
+            }
+            
+            if (expr2.imm_int)
+            {
+                if (op == "-" && *expr2.imm_int == 1)
+                {
+                    push_op(func->code, OP_DECI);
+                    push_varlen_int(func->code, out_reg);
+                    return {ExprInfo::from_var_reg(out_reg)};
+                }
+                if (op == "+" && *expr2.imm_int == 1)
+                {
+                    push_op(func->code, OP_INCI);
+                    push_varlen_int(func->code, out_reg);
+                    return {ExprInfo::from_var_reg(out_reg)};
+                }
             }
             
             push_op(func->code, opcode);

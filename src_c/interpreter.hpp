@@ -23,7 +23,7 @@
 #ifdef NO_THROW_ALL_DANGER_LETS_GO
 #define ASSERT_THROW(X) { }
 #else
-#define ASSERT_THROW(X) { if (!(X)) throw; }
+#define ASSERT_THROW(X) { if (!(X)) [[unlikely]] throw; }
 //#define ASSERT_THROW(X) { if (!(X)) throw; }
 //#define ASSERT_THROW(X) { if (!(X)) throw #X; }
 //#define ASSERT_THROW(X) { assert(X); }
@@ -888,16 +888,13 @@ OPHANDLER_ABI void op_div(OPHANDLER_ARGS)
 {
     INC_PC_FOR_OPCODE(OP_DIV);
     {
-        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto i_in2 = read_varlen_int(pc);
-        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
         auto & var2 = vars[i_in2];
         switch (var1.kind)
         {
         case TYPEID_INT:
-            //out = var1;
             if (var2.kind == TYPEID_INT)
                 var1.data.integer /= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
@@ -907,7 +904,6 @@ OPHANDLER_ABI void op_div(OPHANDLER_ARGS)
             }
             break;
         case TYPEID_FLOAT:
-            //out = var1;
             if (var2.kind == TYPEID_INT)
                 var1.data.real /= var2.data.integer;
             else if (var2.kind == TYPEID_FLOAT)
