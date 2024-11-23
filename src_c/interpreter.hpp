@@ -191,8 +191,8 @@ extern "C" uint16_t read_op(const uint8_t * & pc)
 {
     uint16_t c;
     memcpy(&c, pc, 2);
-    if (*pc >= 0x80) [[likely]]
-        return *pc;
+    //if (*pc >= 0x80) [[likely]]
+        //return *pc;
         //return *pc++;
     //pc += 2;
     return c;
@@ -368,7 +368,6 @@ constexpr OpTable make_opcode_table()
     table.t[OP_JINCILT] = op_jincilt;
     table.t[OP_NEGATE] = op_negate;
     
-    /*
     for (uint16_t n = 0; n < 256; n++)
     {
         if (table.t[n] != op_unk)
@@ -379,7 +378,6 @@ constexpr OpTable make_opcode_table()
             }
         }
     }
-    */
     
     return table;
 }

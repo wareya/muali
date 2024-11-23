@@ -27,7 +27,7 @@ struct Global {
     ListMap<String, size_t> var_names;
 };
 
-#define INTERPRETER_OPCODE_TABLE_BITS 12
+#define INTERPRETER_OPCODE_TABLE_BITS 16
 
 constexpr uint8_t OPINFO_CMPE         = 0x00;
 constexpr uint8_t OPINFO_CMPNE        = 0x01;
