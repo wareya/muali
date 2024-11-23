@@ -547,17 +547,21 @@ OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
     pc += (OP_JINCILTIMM > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
-        int64_t imm = read_u64(pc);
-        int32_t offset = read_u32(pc);
-        //int16_t offset = read_u16(pc);
         
         #ifdef USE_EXTRA_ASSERTS
         ASSERT_THROW(vars[index].kind == TYPEID_INT);
         #endif
-        vars[index].data.integer += 1;
         
-        if (vars[index].data.integer < imm)
+        int64_t imm = read_u64(pc);
+        
+        if (vars[index].data.integer + 1 < imm)
+        {
+            int32_t offset = read_u32(pc);
             pc += offset;
+        }
+        else
+            pc += 4;
+        vars[index].data.integer += 1;
     }
     CALL_NEXT();
 }
