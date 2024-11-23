@@ -1,4 +1,4 @@
-local n = tonumber(arg[1]) or 1000000000 
+local n = 1000000000
 local sum = 0.0
 local flip = -1.0
 for i = 1, n do
@@ -7,4 +7,4 @@ for i = 1, n do
     --sum = sum + flip / (2.0 * i - 1.0)
     sum = sum + flip / (2 * i - 1)
 end
-print(sum * 4.0)
+print(string.format("%.24f", sum * 4.0))
