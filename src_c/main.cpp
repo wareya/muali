@@ -91,6 +91,8 @@ int main(int argc, char ** argv)
     
     printf("main returned %.24f\n", ret.data.real);
     
+    printf("%zd\n", interpreter.accum);
+    
     //throw ret;
     
     return 0;

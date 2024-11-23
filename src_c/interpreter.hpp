@@ -10,6 +10,7 @@
 #include "vm_common.hpp"
 
 #define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
+//#define OPHANDLER_ABI extern "C"
 //#define OPHANDLER_ABI [[clang::preserve_none]]
 //#define OPHANDLER_ABI
 
@@ -185,39 +186,54 @@ struct Variable {
     }
 };
 
+
+//#define OPHANDLER_ARGS const uint8_t * pc, Variable * vars, Interpreter * global
+#define OPHANDLER_ARGS Variable * vars, const uint8_t * pc, Interpreter * global
+#define CALL_ORDER vars, ++pc, global
+
+    //global->accum += 1; 
+#ifdef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
+#define CALL_NEXT() \
+    { auto c = *pc; [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
+#else
+#define CALL_NEXT() \
+    if (opcode_table.t[*pc] != op_unk) global->prev_inst = *pc;\
+    { auto c = *pc; [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
+#endif
+
+
+
 struct Interpreter;
-OPHANDLER_ABI typedef void (*OpHandler)(const uint8_t * pc, Variable * vars, Interpreter * global);
+OPHANDLER_ABI typedef void (*OpHandler)(OPHANDLER_ARGS);
 struct OpTable {
     OpHandler t[256];
 };
 
 
-#define DEF_HANDLER(X) OPHANDLER_ABI void X(const uint8_t *, Variable *, Interpreter *)
+#define DEF_HANDLER(X) OPHANDLER_ABI void X(OPHANDLER_ARGS)
 
 DEF_HANDLER(op_set);
-DEF_HANDLER(op_setimm);
-
 DEF_HANDLER(op_add);
-DEF_HANDLER(op_addimm);
-
 DEF_HANDLER(op_sub);
-DEF_HANDLER(op_subimm);
-
 DEF_HANDLER(op_mul);
-DEF_HANDLER(op_mulimm);
-
 DEF_HANDLER(op_div);
-DEF_HANDLER(op_divimm);
-
 DEF_HANDLER(op_mod);
-DEF_HANDLER(op_modimm);
-
 DEF_HANDLER(op_inci);
 DEF_HANDLER(op_deci);
+
+DEF_HANDLER(op_setimm);
+DEF_HANDLER(op_addimm);
+DEF_HANDLER(op_subimm);
+DEF_HANDLER(op_mulimm);
+DEF_HANDLER(op_divimm);
+DEF_HANDLER(op_modimm);
+DEF_HANDLER(op_inciimm);
+DEF_HANDLER(op_deciimm);
 
 DEF_HANDLER(op_incf);
 DEF_HANDLER(op_decf);
 
+DEF_HANDLER(op_jincilt);
 DEF_HANDLER(op_jinciltimm);
 
 DEF_HANDLER(op_bitand);
@@ -339,6 +355,7 @@ constexpr OpTable make_opcode_table()
     table.t[OP_INCI] = op_inci;
     table.t[OP_DECI] = op_deci;
     table.t[OP_JINCILTIMM] = op_jinciltimm;
+    table.t[OP_JINCILT] = op_jincilt;
     table.t[OP_NEGATE] = op_negate;
     
     return table;
@@ -358,32 +375,25 @@ struct Interpreter {
     uint8_t prev_inst;
 #endif
     
+    size_t accum = 0;
+    
     Interpreter(Global info);
     Variable call_func(Shared<Function> func, Vec<Variable> args);
     Variable call_func_by_name(String funcname, Vec<Variable> args);
 };
 
-OPHANDLER_ABI void op_unk(const uint8_t * pc, Variable * vars, Interpreter * interpreter)
+OPHANDLER_ABI void op_unk(OPHANDLER_ARGS)
 {
     asm("");
     (void)vars;
-    (void)interpreter;
+    (void)global;
     printf("unknown instruction %02X -- breaking!\n", *(pc-1));
 #ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
-    printf("previous instruction was %02X\n", interpreter->prev_inst);
+    printf("previous instruction was %02X\n", global->prev_inst);
 #endif
     throw;
     return;
 }
-
-#ifdef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
-#define CALL_NEXT() \
-    { auto c = *pc; [[clang::musttail]] return opcode_table.t[c](++pc, vars, global); }
-#else
-#define CALL_NEXT() \
-    if (opcode_table.t[*pc] != op_unk) global->prev_inst = *pc;\
-    { auto c = *pc; [[clang::musttail]] return opcode_table.t[c](++pc, vars, global); }
-#endif
 
 Variable read_immediate(const uint8_t * & pc)
 {
@@ -437,6 +447,13 @@ static inline uint8_t read_u8(const uint8_t * & pc)
     pc += 1;
     return ret;
 }
+static inline uint32_t read_u16(const uint8_t * & pc)
+{
+    uint16_t ret;
+    memcpy(&ret, pc, 2);
+    pc += 2;
+    return ret;
+}
 static inline uint32_t read_u32(const uint8_t * & pc)
 {
     uint32_t ret;
@@ -452,7 +469,7 @@ static inline uint64_t read_u64(const uint8_t * & pc)
     return ret;
 }
 
-OPHANDLER_ABI void op_j(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_j(OPHANDLER_ARGS)
 {
     {
         int32_t offset = read_u32(pc);
@@ -461,7 +478,7 @@ OPHANDLER_ABI void op_j(const uint8_t * pc, Variable * vars, Interpreter * globa
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_jiltimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_jiltimm(OPHANDLER_ARGS)
 {
     {
         auto index = read_varlen_int(pc);
@@ -476,7 +493,7 @@ OPHANDLER_ABI void op_jiltimm(const uint8_t * pc, Variable * vars, Interpreter *
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_inci(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_inci(OPHANDLER_ARGS)
 {
     {
         auto index = read_varlen_int(pc);
@@ -485,7 +502,7 @@ OPHANDLER_ABI void op_inci(const uint8_t * pc, Variable * vars, Interpreter * gl
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_deci(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_deci(OPHANDLER_ARGS)
 {
     {
         auto index = read_varlen_int(pc);
@@ -494,12 +511,13 @@ OPHANDLER_ABI void op_deci(const uint8_t * pc, Variable * vars, Interpreter * gl
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_jinciltimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
 {
     {
         auto index = read_varlen_int(pc);
         int64_t imm = read_u64(pc);
         int32_t offset = read_u32(pc);
+        //int16_t offset = read_u16(pc);
         
         ASSERT_THROW(vars[index].kind == TYPEID_INT);
         vars[index].data.integer += 1;
@@ -510,7 +528,24 @@ OPHANDLER_ABI void op_jinciltimm(const uint8_t * pc, Variable * vars, Interprete
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_negate(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_jincilt(OPHANDLER_ARGS)
+{
+    {
+        auto index = read_varlen_int(pc);
+        auto i_index = read_varlen_int(pc);
+        int32_t offset = read_u32(pc);
+        //int16_t offset = read_u16(pc);
+        
+        ASSERT_THROW(vars[index].kind == TYPEID_INT && vars[i_index].kind == TYPEID_INT);
+        vars[index].data.integer += 1;
+        
+        if (vars[index].data.integer < vars[i_index].data.integer)
+            pc += offset;
+    }
+    CALL_NEXT();
+}
+
+OPHANDLER_ABI void op_negate(OPHANDLER_ARGS)
 {
     {
         auto index = read_varlen_int(pc);
@@ -530,7 +565,7 @@ OPHANDLER_ABI void op_negate(const uint8_t * pc, Variable * vars, Interpreter * 
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_setimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_setimm(OPHANDLER_ARGS)
 {
     {
         auto index = read_varlen_int(pc);
@@ -539,7 +574,7 @@ OPHANDLER_ABI void op_setimm(const uint8_t * pc, Variable * vars, Interpreter * 
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_set(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_set(OPHANDLER_ARGS)
 {
     {
         auto index = read_varlen_int(pc);
@@ -550,7 +585,7 @@ OPHANDLER_ABI void op_set(const uint8_t * pc, Variable * vars, Interpreter * glo
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_setzeroi(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_setzeroi(OPHANDLER_ARGS)
 {
     {
         auto index = read_varlen_int(pc);
@@ -560,7 +595,7 @@ OPHANDLER_ABI void op_setzeroi(const uint8_t * pc, Variable * vars, Interpreter 
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_add(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_add(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -594,7 +629,7 @@ OPHANDLER_ABI void op_add(const uint8_t * pc, Variable * vars, Interpreter * glo
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_addimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_addimm(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -628,7 +663,7 @@ OPHANDLER_ABI void op_addimm(const uint8_t * pc, Variable * vars, Interpreter * 
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_sub(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_sub(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -662,7 +697,7 @@ OPHANDLER_ABI void op_sub(const uint8_t * pc, Variable * vars, Interpreter * glo
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_subimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_subimm(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -697,7 +732,7 @@ OPHANDLER_ABI void op_subimm(const uint8_t * pc, Variable * vars, Interpreter * 
 }
 
 
-OPHANDLER_ABI void op_mul(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_mul(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -731,7 +766,7 @@ OPHANDLER_ABI void op_mul(const uint8_t * pc, Variable * vars, Interpreter * glo
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_mulimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_mulimm(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -765,7 +800,7 @@ OPHANDLER_ABI void op_mulimm(const uint8_t * pc, Variable * vars, Interpreter * 
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_div(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_div(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -800,7 +835,7 @@ OPHANDLER_ABI void op_div(const uint8_t * pc, Variable * vars, Interpreter * glo
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_divimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_divimm(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -836,7 +871,7 @@ OPHANDLER_ABI void op_divimm(const uint8_t * pc, Variable * vars, Interpreter * 
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_shl(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_shl(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -851,7 +886,7 @@ OPHANDLER_ABI void op_shl(const uint8_t * pc, Variable * vars, Interpreter * glo
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_shlimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_shlimm(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -867,7 +902,7 @@ OPHANDLER_ABI void op_shlimm(const uint8_t * pc, Variable * vars, Interpreter * 
 }
 
 
-OPHANDLER_ABI void op_shr(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_shr(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -882,7 +917,7 @@ OPHANDLER_ABI void op_shr(const uint8_t * pc, Variable * vars, Interpreter * glo
     }
     CALL_NEXT();
 }
-OPHANDLER_ABI void op_shrimm(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_shrimm(OPHANDLER_ARGS)
 {
     {
         //auto i_out = read_varlen_int(pc);
@@ -897,7 +932,7 @@ OPHANDLER_ABI void op_shrimm(const uint8_t * pc, Variable * vars, Interpreter * 
     CALL_NEXT();
 }
 
-OPHANDLER_ABI void op_returnval(const uint8_t * pc, Variable * vars, Interpreter * global)
+OPHANDLER_ABI void op_returnval(OPHANDLER_ARGS)
 {
     {
         auto i = read_varlen_int(pc);
@@ -917,20 +952,21 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
 {
     (void)args;
     
-    Vec<Variable> vars;
+    Vec<Variable> _vars;
     printf("allocating %zu var-regs....\n", func->num_vars + func->num_regs);
     for (size_t i = 0; i < func->num_vars + func->num_regs; i++)
-        vars.push_back(Variable());
-    printf("allocated %zu var-regs\n", vars.size());
+        _vars.push_back(Variable());
+    printf("allocated %zu var-regs\n", _vars.size());
     
     const uint8_t * pc = func->code.data();
-    auto v = vars.data();
+    auto vars = _vars.data();
 #ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
     prev_inst = *pc;
 #else
     uint8_t prev_inst = *pc;
 #endif
-    opcode_table.t[prev_inst](++pc, v, this);
+    auto global = this;
+    opcode_table.t[prev_inst](CALL_ORDER);
     return std::move(retval);
 }
 

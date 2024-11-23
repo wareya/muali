@@ -83,6 +83,7 @@ constexpr uint8_t OP_DOUBLEF          = 0x2A;
 constexpr uint8_t OP_HALVEF           = 0x2B;
 constexpr uint8_t OP_RECIPF           = 0x2C;
 
+constexpr uint8_t OP_JINCILT          = 0x2E;
 constexpr uint8_t OP_JINCILTIMM       = 0x2F;
 
 constexpr uint8_t OP_CMPI0            = 0x30;
@@ -112,6 +113,27 @@ constexpr uint8_t OP_SETEMPTYARRAY    = 0x68;
 constexpr uint8_t OP_SETEMPTYDICT     = 0x69;
 constexpr uint8_t OP_SETTRUE          = 0x6A;
 constexpr uint8_t OP_SETFALSE         = 0x6B;
+/*
+constexpr uint8_t OP_ADDI             = 0x70;
+constexpr uint8_t OP_ADDANY           = 0x71;
+constexpr uint8_t OP_ADDIMMI          = 0x72;
+constexpr uint8_t OP_ADDIMMANY        = 0x73;
+
+constexpr uint8_t OP_SUBI             = 0x74;
+constexpr uint8_t OP_SUBANY           = 0x75;
+constexpr uint8_t OP_SUBIMMI          = 0x76;
+constexpr uint8_t OP_SUBIMMANY        = 0x77;
+
+constexpr uint8_t OP_MULI             = 0x78;
+constexpr uint8_t OP_MULANY           = 0x79;
+constexpr uint8_t OP_MULIMMI          = 0x7A;
+constexpr uint8_t OP_MULIMMANY        = 0x7B;
+
+constexpr uint8_t OP_DIVI             = 0x7C;
+constexpr uint8_t OP_DIVANY           = 0x7D;
+constexpr uint8_t OP_DIVIMMI          = 0x7E;
+constexpr uint8_t OP_DIVIMMANY        = 0x7F;
+*/
 
 constexpr uint8_t OP_TOSTRING         = 0x80;
 constexpr uint8_t OP_TOINT            = 0x81;

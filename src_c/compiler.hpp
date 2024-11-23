@@ -129,6 +129,12 @@ static inline void push_varlen_int(T & buffer, size_t myint)
 }
 
 template<typename T>
+static inline void push_u16(T & buffer, uint16_t imm)
+{
+    buffer.push_back(imm);
+    buffer.push_back(imm >> 8);
+}
+template<typename T>
 static inline void push_u32(T & buffer, uint32_t imm)
 {
     buffer.push_back(imm);
@@ -361,6 +367,22 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             else
                 assert(((void)"TODO (binexp)", 0));
             
+            if (expr1.is_var_reg() && expr2.imm_int)
+            {
+                if (op == "-" && *expr2.imm_int == 1)
+                {
+                    func->code.push_back(OP_DECI);
+                    push_varlen_int(func->code, *expr1.var_reg);
+                    return expr1;
+                }
+                if (op == "+" && *expr2.imm_int == 1)
+                {
+                    func->code.push_back(OP_INCI);
+                    push_varlen_int(func->code, *expr1.var_reg);
+                    return expr1;
+                }
+            }
+            
             if (expr1.is_var_reg())
                 info.free_register(*expr1.var_reg); // does nothing if passed a variable
             
@@ -514,9 +536,15 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         if (node->children.size() == 4)
             n = 2;
         
+        size_t t_var_index = info.add_var("");
+        
         auto _expr = compile_func_inner(node->children[n], func, info, global);
         assert(_expr);
         auto expr = *_expr;
+        
+        func->code.push_back(OP_SETIMM);
+        push_varlen_int(func->code, t_var_index);
+        push_immediate(func->code, expr);
         
         if (expr.imm_int)
         {
@@ -552,11 +580,19 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             assert(diff >= -2147483647 && diff <= 2147483647);
             int32_t diff32 = diff;
             memcpy(func->code.data() + offset_pos, &diff32, 4);
+            //int16_t diff16 = diff;
+            //memcpy(func->code.data() + offset_pos, &diff16, 2);
+            //int8_t diff8 = diff;
+            //memcpy(func->code.data() + offset_pos, &diff8, 1);
             
-            func->code.push_back(OP_JINCILTIMM);
+            //func->code.push_back(OP_JINCILTIMM);
+            func->code.push_back(OP_JINCILT);
             push_varlen_int(func->code, var_index);
-            push_u64(func->code, *expr.imm_int);
+            push_varlen_int(func->code, t_var_index);
+            //push_varlen_int(func->code, j_var_index);
+            //push_u64(func->code, *expr.imm_int);
             push_u32(func->code, (ptrdiff_t)offset_pos - (ptrdiff_t)func->code.size());
+            //push_u16(func->code, (ptrdiff_t)offset_pos - (ptrdiff_t)func->code.size() + 2);
         }
         else
         {
@@ -589,8 +625,8 @@ static inline void count_vardecs(Shared<ASTNode> node, size_t * vardecs)
     if (node->text && *node->text == "vardec")
         *vardecs += 1;
     else if (node->text && *node->text == "foreach")
-        *vardecs += 1;
-        //*vardecs += 2;
+        //*vardecs += 1;
+        *vardecs += 2;
     
     for (auto node : node->children)
         count_vardecs(node, vardecs);
