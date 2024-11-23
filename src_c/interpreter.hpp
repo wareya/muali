@@ -187,149 +187,159 @@ struct Variable {
 };
 
 
+extern "C" uint16_t read_op(const uint8_t * & pc)
+{
+    uint16_t c;
+    memcpy(&c, pc, 2);
+    if (*pc >= 0x80) [[likely]]
+        return *pc;
+        //return *pc++;
+    //pc += 2;
+    return c;
+}
+
+
 //#define OPHANDLER_ARGS const uint8_t * pc, Variable * vars, Interpreter * global
 #define OPHANDLER_ARGS Variable * vars, const uint8_t * pc, Interpreter * global
-#define CALL_ORDER vars, ++pc, global
+#define CALL_ORDER vars, pc, global
 
     //global->accum += 1; 
 #ifdef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
 #define CALL_NEXT() \
-    { auto c = *pc; [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
+    { uint16_t c = read_op(pc); [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
 #else
 #define CALL_NEXT() \
     if (opcode_table.t[*pc] != op_unk) global->prev_inst = *pc;\
-    { auto c = *pc; [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
+    { uint16_t c = read_op(pc); [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
 #endif
-
-
 
 struct Interpreter;
 OPHANDLER_ABI typedef void (*OpHandler)(OPHANDLER_ARGS);
 struct OpTable {
-    OpHandler t[256];
+    OpHandler t[(1<<INTERPRETER_OPCODE_TABLE_BITS)];
 };
 
 
-#define DEF_HANDLER(X) OPHANDLER_ABI void X(OPHANDLER_ARGS)
+#define DEC_HANDLER(X) OPHANDLER_ABI void X(OPHANDLER_ARGS)
 
-DEF_HANDLER(op_set);
-DEF_HANDLER(op_add);
-DEF_HANDLER(op_sub);
-DEF_HANDLER(op_mul);
-DEF_HANDLER(op_div);
-DEF_HANDLER(op_mod);
-DEF_HANDLER(op_inci);
-DEF_HANDLER(op_deci);
+DEC_HANDLER(op_set);
+DEC_HANDLER(op_add);
+DEC_HANDLER(op_sub);
+DEC_HANDLER(op_mul);
+DEC_HANDLER(op_div);
+DEC_HANDLER(op_mod);
+DEC_HANDLER(op_inci);
+DEC_HANDLER(op_deci);
 
-DEF_HANDLER(op_setimm);
-DEF_HANDLER(op_addimm);
-DEF_HANDLER(op_subimm);
-DEF_HANDLER(op_mulimm);
-DEF_HANDLER(op_divimm);
-DEF_HANDLER(op_modimm);
-DEF_HANDLER(op_inciimm);
-DEF_HANDLER(op_deciimm);
+DEC_HANDLER(op_setimm);
+DEC_HANDLER(op_addimm);
+DEC_HANDLER(op_subimm);
+DEC_HANDLER(op_mulimm);
+DEC_HANDLER(op_divimm);
+DEC_HANDLER(op_modimm);
+DEC_HANDLER(op_inciimm);
+DEC_HANDLER(op_deciimm);
 
-DEF_HANDLER(op_incf);
-DEF_HANDLER(op_decf);
+DEC_HANDLER(op_incf);
+DEC_HANDLER(op_decf);
 
-DEF_HANDLER(op_jincilt);
-DEF_HANDLER(op_jinciltimm);
+DEC_HANDLER(op_jincilt);
+DEC_HANDLER(op_jinciltimm);
 
-DEF_HANDLER(op_bitand);
-DEF_HANDLER(op_bitor);
-DEF_HANDLER(op_bitxor);
-DEF_HANDLER(op_shl);
-DEF_HANDLER(op_shr);
+DEC_HANDLER(op_bitand);
+DEC_HANDLER(op_bitor);
+DEC_HANDLER(op_bitxor);
+DEC_HANDLER(op_shl);
+DEC_HANDLER(op_shr);
 
-DEF_HANDLER(op_bitandimm);
-DEF_HANDLER(op_bitorimm);
-DEF_HANDLER(op_bitxorimm);
-DEF_HANDLER(op_shlimm);
-DEF_HANDLER(op_shrimm);
+DEC_HANDLER(op_bitandimm);
+DEC_HANDLER(op_bitorimm);
+DEC_HANDLER(op_bitxorimm);
+DEC_HANDLER(op_shlimm);
+DEC_HANDLER(op_shrimm);
 
-DEF_HANDLER(op_negate);
-DEF_HANDLER(op_not);
+DEC_HANDLER(op_negate);
+DEC_HANDLER(op_not);
 
-DEF_HANDLER(op_cmpi0);
-DEF_HANDLER(op_cmpi1);
-DEF_HANDLER(op_cmpf0);
-DEF_HANDLER(op_cmpf1);
+DEC_HANDLER(op_cmpi0);
+DEC_HANDLER(op_cmpi1);
+DEC_HANDLER(op_cmpf0);
+DEC_HANDLER(op_cmpf1);
 
-DEF_HANDLER(op_cmpe);
-DEF_HANDLER(op_cmpne);
-DEF_HANDLER(op_cmpgt);
-DEF_HANDLER(op_cmplt);
-DEF_HANDLER(op_cmpgte);
-DEF_HANDLER(op_cmplte);
+DEC_HANDLER(op_cmpe);
+DEC_HANDLER(op_cmpne);
+DEC_HANDLER(op_cmpgt);
+DEC_HANDLER(op_cmplt);
+DEC_HANDLER(op_cmpgte);
+DEC_HANDLER(op_cmplte);
 
-DEF_HANDLER(op_and);
-DEF_HANDLER(op_or);
+DEC_HANDLER(op_and);
+DEC_HANDLER(op_or);
 
-DEF_HANDLER(op_setnull);
-DEF_HANDLER(op_setzeroi);
-DEF_HANDLER(op_setzerof);
-DEF_HANDLER(op_setonei);
-DEF_HANDLER(op_setonef);
-DEF_HANDLER(op_setnegonei);
-DEF_HANDLER(op_setnegonef);
-DEF_HANDLER(op_setemptystr);
-DEF_HANDLER(op_setemptyarray);
-DEF_HANDLER(op_setemptydict);
-DEF_HANDLER(op_settrue);
-DEF_HANDLER(op_setfalse);
+DEC_HANDLER(op_setnull);
+DEC_HANDLER(op_setzeroi);
+DEC_HANDLER(op_setzerof);
+DEC_HANDLER(op_setonei);
+DEC_HANDLER(op_setonef);
+DEC_HANDLER(op_setnegonei);
+DEC_HANDLER(op_setnegonef);
+DEC_HANDLER(op_setemptystr);
+DEC_HANDLER(op_setemptyarray);
+DEC_HANDLER(op_setemptydict);
+DEC_HANDLER(op_settrue);
+DEC_HANDLER(op_setfalse);
 
-DEF_HANDLER(op_tostring);
-DEF_HANDLER(op_toint);
-DEF_HANDLER(op_tofloat);
-DEF_HANDLER(op_ftoibits);
-DEF_HANDLER(op_itofbits);
+DEC_HANDLER(op_tostring);
+DEC_HANDLER(op_toint);
+DEC_HANDLER(op_tofloat);
+DEC_HANDLER(op_ftoibits);
+DEC_HANDLER(op_itofbits);
 
-DEF_HANDLER(op_get_index);
-DEF_HANDLER(op_set_index);
-DEF_HANDLER(op_set_indeximm);
+DEC_HANDLER(op_get_index);
+DEC_HANDLER(op_set_index);
+DEC_HANDLER(op_set_indeximm);
 
-DEF_HANDLER(op_get_member);
-DEF_HANDLER(op_set_member);
-DEF_HANDLER(op_set_memberimm);
+DEC_HANDLER(op_get_member);
+DEC_HANDLER(op_set_member);
+DEC_HANDLER(op_set_memberimm);
 
-DEF_HANDLER(op_get_global);
-DEF_HANDLER(op_set_global);
-DEF_HANDLER(op_set_globalimm);
+DEC_HANDLER(op_get_global);
+DEC_HANDLER(op_set_global);
+DEC_HANDLER(op_set_globalimm);
 
-DEF_HANDLER(op_sqrt);
+DEC_HANDLER(op_sqrt);
 
-DEF_HANDLER(op_returnval);
-DEF_HANDLER(op_returnimm);
-DEF_HANDLER(op_returnnull);
+DEC_HANDLER(op_returnval);
+DEC_HANDLER(op_returnimm);
+DEC_HANDLER(op_returnnull);
 
-DEF_HANDLER(op_call);
-DEF_HANDLER(op_call_indirect);
-DEF_HANDLER(op_calldiscard);
-DEF_HANDLER(op_calld_indirect);
+DEC_HANDLER(op_call);
+DEC_HANDLER(op_call_indirect);
+DEC_HANDLER(op_calldiscard);
+DEC_HANDLER(op_calld_indirect);
 
-DEF_HANDLER(op_j);
-DEF_HANDLER(op_jif);
-DEF_HANDLER(op_jifnot);
-DEF_HANDLER(op_jifnull);
-DEF_HANDLER(op_jifnotnull);
-DEF_HANDLER(op_jcmp);
-DEF_HANDLER(op_jcmpimm);
-DEF_HANDLER(op_jiltimm);
+DEC_HANDLER(op_j);
+DEC_HANDLER(op_jif);
+DEC_HANDLER(op_jifnot);
+DEC_HANDLER(op_jifnull);
+DEC_HANDLER(op_jifnotnull);
+DEC_HANDLER(op_jcmp);
+DEC_HANDLER(op_jcmpimm);
+DEC_HANDLER(op_jiltimm);
 
-DEF_HANDLER(op_become);
-DEF_HANDLER(op_become_indirect);
+DEC_HANDLER(op_become);
+DEC_HANDLER(op_become_indirect);
 
-DEF_HANDLER(op_noop);
-DEF_HANDLER(op_exit);
-DEF_HANDLER(op_fault);
+DEC_HANDLER(op_noop);
+DEC_HANDLER(op_exit);
+DEC_HANDLER(op_fault);
 
-DEF_HANDLER(op_unk);
+DEC_HANDLER(op_unk);
 
 constexpr OpTable make_opcode_table()
 {
     OpTable table;
-    for (size_t i = 0; i < 256; i++)
+    for (size_t i = 0; i < (1<<INTERPRETER_OPCODE_TABLE_BITS); i++)
         table.t[i] = op_unk;
     
     table.t[OP_SET] = op_set;
@@ -358,6 +368,19 @@ constexpr OpTable make_opcode_table()
     table.t[OP_JINCILT] = op_jincilt;
     table.t[OP_NEGATE] = op_negate;
     
+    /*
+    for (uint16_t n = 0; n < 256; n++)
+    {
+        if (table.t[n] != op_unk)
+        {
+            for (uint16_t n2 = 256; n2 != 0; n2 += 256)
+            {
+                table.t[n + n2] = table.t[n];
+            }
+        }
+    }
+    */
+    
     return table;
 }
 
@@ -372,7 +395,7 @@ struct Interpreter {
     Variable retval; // return value trampoline
     
 #ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
-    uint8_t prev_inst;
+    uint16_t prev_inst;
 #endif
     
     size_t accum = 0;
@@ -382,9 +405,10 @@ struct Interpreter {
     Variable call_func_by_name(String funcname, Vec<Variable> args);
 };
 
+
 OPHANDLER_ABI void op_unk(OPHANDLER_ARGS)
 {
-    asm("");
+    //pc += (OP_UNK > 0xFF) ? 2 : 1;
     (void)vars;
     (void)global;
     printf("unknown instruction %02X -- breaking!\n", *(pc-1));
@@ -471,6 +495,7 @@ static inline uint64_t read_u64(const uint8_t * & pc)
 
 OPHANDLER_ABI void op_j(OPHANDLER_ARGS)
 {
+    pc += (OP_J > 0xFF) ? 2 : 1;
     {
         int32_t offset = read_u32(pc);
         pc += offset;
@@ -480,6 +505,7 @@ OPHANDLER_ABI void op_j(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_jiltimm(OPHANDLER_ARGS)
 {
+    pc += (OP_JILTIMM > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         int64_t imm = read_u64(pc);
@@ -495,6 +521,7 @@ OPHANDLER_ABI void op_jiltimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_inci(OPHANDLER_ARGS)
 {
+    pc += (OP_INCI > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         ASSERT_THROW(vars[index].kind == TYPEID_INT);
@@ -504,6 +531,7 @@ OPHANDLER_ABI void op_inci(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_deci(OPHANDLER_ARGS)
 {
+    pc += (OP_DECI > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         ASSERT_THROW(vars[index].kind == TYPEID_INT);
@@ -515,6 +543,7 @@ OPHANDLER_ABI void op_deci(OPHANDLER_ARGS)
 #define USE_EXTRA_ASSERTS
 OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
 {
+    pc += (OP_JINCILTIMM > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         int64_t imm = read_u64(pc);
@@ -533,6 +562,7 @@ OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_jincilt(OPHANDLER_ARGS)
 {
+    pc += (OP_JINCILT > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         auto i_index = read_varlen_int(pc);
@@ -552,6 +582,7 @@ OPHANDLER_ABI void op_jincilt(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_negate(OPHANDLER_ARGS)
 {
+    pc += (OP_NEGATE > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         auto & var = vars[index];
@@ -572,6 +603,7 @@ OPHANDLER_ABI void op_negate(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_setimm(OPHANDLER_ARGS)
 {
+    pc += (OP_SETIMM > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         auto var = read_immediate(pc);
@@ -581,6 +613,7 @@ OPHANDLER_ABI void op_setimm(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_set(OPHANDLER_ARGS)
 {
+    pc += (OP_SET > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         auto varindex = read_varlen_int(pc);
@@ -592,6 +625,7 @@ OPHANDLER_ABI void op_set(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_setzeroi(OPHANDLER_ARGS)
 {
+    pc += (OP_SETZEROI > 0xFF) ? 2 : 1;
     {
         auto index = read_varlen_int(pc);
         vars[index] = Variable::of_type(TYPEID_INT);
@@ -602,6 +636,7 @@ OPHANDLER_ABI void op_setzeroi(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_add(OPHANDLER_ARGS)
 {
+    pc += (OP_ADD > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -636,6 +671,7 @@ OPHANDLER_ABI void op_add(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_addimm(OPHANDLER_ARGS)
 {
+    pc += (OP_ADDIMM > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -670,6 +706,7 @@ OPHANDLER_ABI void op_addimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_sub(OPHANDLER_ARGS)
 {
+    pc += (OP_SUB > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -704,6 +741,7 @@ OPHANDLER_ABI void op_sub(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_subimm(OPHANDLER_ARGS)
 {
+    pc += (OP_SUBIMM > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -739,6 +777,7 @@ OPHANDLER_ABI void op_subimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_mul(OPHANDLER_ARGS)
 {
+    pc += (OP_MUL > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -773,6 +812,7 @@ OPHANDLER_ABI void op_mul(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_mulimm(OPHANDLER_ARGS)
 {
+    pc += (OP_MULIMM > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -807,6 +847,7 @@ OPHANDLER_ABI void op_mulimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_div(OPHANDLER_ARGS)
 {
+    pc += (OP_DIV > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -842,6 +883,7 @@ OPHANDLER_ABI void op_div(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_divimm(OPHANDLER_ARGS)
 {
+    pc += (OP_DIVIMM > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -878,6 +920,7 @@ OPHANDLER_ABI void op_divimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_shl(OPHANDLER_ARGS)
 {
+    pc += (OP_SHL > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -893,6 +936,7 @@ OPHANDLER_ABI void op_shl(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_shlimm(OPHANDLER_ARGS)
 {
+    pc += (OP_SHLIMM > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -909,6 +953,7 @@ OPHANDLER_ABI void op_shlimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_shr(OPHANDLER_ARGS)
 {
+    pc += (OP_SHR > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -924,6 +969,7 @@ OPHANDLER_ABI void op_shr(OPHANDLER_ARGS)
 }
 OPHANDLER_ABI void op_shrimm(OPHANDLER_ARGS)
 {
+    pc += (OP_SHRIMM > 0xFF) ? 2 : 1;
     {
         //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
@@ -939,6 +985,7 @@ OPHANDLER_ABI void op_shrimm(OPHANDLER_ARGS)
 
 OPHANDLER_ABI void op_returnval(OPHANDLER_ARGS)
 {
+    pc += (OP_RETURNVAL > 0xFF) ? 2 : 1;
     {
         auto i = read_varlen_int(pc);
         auto & ret = vars[i];
@@ -966,9 +1013,9 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
     const uint8_t * pc = func->code.data();
     auto vars = _vars.data();
 #ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
-    prev_inst = *pc;
+    prev_inst = read_op(pc);
 #else
-    uint8_t prev_inst = *pc;
+    uint16_t prev_inst = read_op(pc);
 #endif
     auto global = this;
     opcode_table.t[prev_inst](CALL_ORDER);

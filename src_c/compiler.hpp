@@ -118,6 +118,21 @@ struct FuncCompInfo {
 };
 
 template<typename T>
+static inline void push_op(T & buffer, uint16_t op)
+{
+    assert(op >= 0x80);
+    assert((uint32_t)op < (1<<INTERPRETER_OPCODE_TABLE_BITS));
+    if (op > 0xFF)
+    {
+        assert((op & 0xFF) < 0x80);
+        buffer.push_back(uint8_t(op));
+        buffer.push_back(uint8_t(op >> 8));
+    }
+    else
+        buffer.push_back(uint8_t(op));
+}
+
+template<typename T>
 static inline void push_varlen_int(T & buffer, size_t myint)
 {
     while (myint >= 255)
@@ -207,13 +222,13 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             
             if (expr.is_immediate())
             {
-                func->code.push_back(OP_SETIMM);
+                push_op(func->code, OP_SETIMM);
                 push_varlen_int(func->code, var_index);
                 push_immediate(func->code, expr);
             }
             else if (expr.is_var_reg())
             {
-                func->code.push_back(OP_SET);
+                push_op(func->code, OP_SET);
                 push_varlen_int(func->code, var_index);
                 push_varlen_int(func->code, *expr.var_reg);
                 printf("!!! emitting declaration assignment with %zu...\n", *expr.var_reg);
@@ -240,13 +255,13 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         
         if (expr.is_immediate())
         {
-            func->code.push_back(OP_SETIMM);
+            push_op(func->code, OP_SETIMM);
             push_varlen_int(func->code, var_index);
             push_immediate(func->code, expr);
         }
         else if (expr.is_var_reg())
         {
-            func->code.push_back(OP_SET);
+            push_op(func->code, OP_SET);
             push_varlen_int(func->code, var_index);
             printf("!!! emitting normal assignment with %zu...\n", *expr.var_reg);
             push_varlen_int(func->code, *expr.var_reg);
@@ -305,7 +320,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 else if (*text == "-")
                 {
                     assert(ret->is_var_reg());
-                    func->code.push_back(OP_NEGATE);
+                    push_op(func->code, OP_NEGATE);
                     push_varlen_int(func->code, *ret->var_reg);
                     return ret;
                 }
@@ -339,31 +354,31 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             auto & op = *node->children[1]->children[0]->text;
             
             printf("%s\n", op.data());
-            uint8_t op_byte;
+            uint16_t opcode;
             if (op == "+" && !expr2.is_immediate())
-                op_byte = OP_ADD;
+                opcode = OP_ADD;
             else if (op == "+" && expr2.is_immediate())
-                op_byte = OP_ADDIMM;
+                opcode = OP_ADDIMM;
             else if (op == "-" && !expr2.is_immediate())
-                op_byte = OP_SUB;
+                opcode = OP_SUB;
             else if (op == "-" && expr2.is_immediate())
-                op_byte = OP_SUBIMM;
+                opcode = OP_SUBIMM;
             else if (op == "*" && !expr2.is_immediate())
-                op_byte = OP_MUL;
+                opcode = OP_MUL;
             else if (op == "*" && expr2.is_immediate())
-                op_byte = OP_MULIMM;
+                opcode = OP_MULIMM;
             else if (op == "/" && !expr2.is_immediate())
-                op_byte = OP_DIV;
+                opcode = OP_DIV;
             else if (op == "/" && expr2.is_immediate())
-                op_byte = OP_DIVIMM;
+                opcode = OP_DIVIMM;
             else if (op == "<<" && !expr2.is_immediate())
-                op_byte = OP_SHL;
+                opcode = OP_SHL;
             else if (op == "<<" && expr2.is_immediate())
-                op_byte = OP_SHLIMM;
+                opcode = OP_SHLIMM;
             else if (op == ">>" && !expr2.is_immediate())
-                op_byte = OP_SHR;
+                opcode = OP_SHR;
             else if (op == ">>" && expr2.is_immediate())
-                op_byte = OP_SHRIMM;
+                opcode = OP_SHRIMM;
             else
                 assert(((void)"TODO (binexp)", 0));
             
@@ -371,13 +386,13 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             {
                 if (op == "-" && *expr2.imm_int == 1)
                 {
-                    func->code.push_back(OP_DECI);
+                    push_op(func->code, OP_DECI);
                     push_varlen_int(func->code, *expr1.var_reg);
                     return expr1;
                 }
                 if (op == "+" && *expr2.imm_int == 1)
                 {
-                    func->code.push_back(OP_INCI);
+                    push_op(func->code, OP_INCI);
                     push_varlen_int(func->code, *expr1.var_reg);
                     return expr1;
                 }
@@ -392,7 +407,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             {
                 if (expr1.is_immediate())
                 {
-                    func->code.push_back(OP_SETIMM);
+                    push_op(func->code, OP_SETIMM);
                     push_varlen_int(func->code, out_reg);
                     push_immediate(func->code, expr1);
                     expr1 = ExprInfo::from_var_reg(out_reg);
@@ -402,12 +417,12 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             }
             else if (*expr1.var_reg != out_reg)
             {
-                func->code.push_back(OP_SET);
+                push_op(func->code, OP_SET);
                 push_varlen_int(func->code, out_reg);
                 push_varlen_int(func->code, *expr1.var_reg);
             }
             
-            func->code.push_back(op_byte);
+            push_op(func->code, opcode);
             push_varlen_int(func->code, out_reg);
             
             if (expr2.is_var_reg())
@@ -441,27 +456,27 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         auto & op = *node->children[1]->children[0]->text;
         
         printf("%s\n", op.data());
-        uint8_t op_byte;
+        uint8_t opcode;
         if (op == "+=" && !expr2.is_immediate())
-            op_byte = OP_ADD;
+            opcode = OP_ADD;
         else if (op == "+=" && expr2.is_immediate())
-            op_byte = OP_ADDIMM;
+            opcode = OP_ADDIMM;
         else if (op == "-=" && !expr2.is_immediate())
-            op_byte = OP_SUB;
+            opcode = OP_SUB;
         else if (op == "-=" && expr2.is_immediate())
-            op_byte = OP_SUBIMM;
+            opcode = OP_SUBIMM;
         else if (op == "*=" && !expr2.is_immediate())
-            op_byte = OP_MUL;
+            opcode = OP_MUL;
         else if (op == "*=" && expr2.is_immediate())
-            op_byte = OP_MULIMM;
+            opcode = OP_MULIMM;
         else if (op == "/=" && !expr2.is_immediate())
-            op_byte = OP_DIV;
+            opcode = OP_DIV;
         else if (op == "/=" && expr2.is_immediate())
-            op_byte = OP_DIVIMM;
+            opcode = OP_DIVIMM;
         else
             assert(((void)"TODO (binexp)", 0));
         
-        func->code.push_back(op_byte);
+        push_op(func->code, opcode);
         push_varlen_int(func->code, var_index);
         //push_varlen_int(func->code, var_index);
         
@@ -479,7 +494,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
     {
         if (node->children.size() == 0)
         {
-            func->code.push_back(OP_RETURNIMM);
+            push_op(func->code, OP_RETURNIMM);
             push_immediate(func->code, ExprInfo::of_null());
         }
         else
@@ -490,12 +505,12 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             
             if (expr.is_immediate())
             {
-                func->code.push_back(OP_RETURNIMM);
+                push_op(func->code, OP_RETURNIMM);
                 push_immediate(func->code, expr);
             }
             else if (expr.is_var_reg())
             {
-                func->code.push_back(OP_RETURNVAL);
+                push_op(func->code, OP_RETURNVAL);
                 push_varlen_int(func->code, *expr.var_reg);
                 info.free_register(*expr.var_reg);
             }
@@ -544,7 +559,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         
         #ifndef USE_IMM
         size_t t_var_index = info.add_var("");
-        func->code.push_back(OP_SETIMM);
+        push_op(func->code, OP_SETIMM);
         push_varlen_int(func->code, t_var_index);
         push_immediate(func->code, expr);
         #endif
@@ -558,25 +573,25 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 auto expr = *_expr;
                 
                 *expr.imm_int -= 1;
-                func->code.push_back(OP_SETIMM);
+                push_op(func->code, OP_SETIMM);
                 push_varlen_int(func->code, var_index);
                 push_immediate(func->code, expr);
             }
             else
             {
-                func->code.push_back(OP_SETZEROI);
+                push_op(func->code, OP_SETZEROI);
                 push_varlen_int(func->code, var_index);
-                func->code.push_back(OP_DECI);
+                push_op(func->code, OP_DECI);
                 push_varlen_int(func->code, var_index);
             }
             
-            func->code.push_back(OP_J);
+            push_op(func->code, OP_J);
             size_t offset_pos = func->code.size();
             push_u32(func->code, 0);
             
             compile_func_inner(node->children.back(), func, info, global);
             
-            //func->code.push_back(OP_INCI);
+            //push_op(func->code, OP_INCI);
             //func->code.push_back(var_index);
             
             int64_t diff = (ptrdiff_t)func->code.size() - (ptrdiff_t)(offset_pos + 4);
@@ -589,11 +604,11 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             //memcpy(func->code.data() + offset_pos, &diff8, 1);
             
             #ifndef USE_IMM
-            func->code.push_back(OP_JINCILT);
+            push_op(func->code, OP_JINCILT);
             push_varlen_int(func->code, var_index);
             push_varlen_int(func->code, t_var_index);
             #else
-            func->code.push_back(OP_JINCILTIMM);
+            push_op(func->code, OP_JINCILTIMM);
             push_varlen_int(func->code, var_index);
             push_u64(func->code, *expr.imm_int);
             #endif
@@ -604,7 +619,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         {
             //size_t expr_var_index = info.add_var("");
             
-            func->code.push_back(OP_SETIMM);
+            push_op(func->code, OP_SETIMM);
             push_varlen_int(func->code, var_index);
             
             info.free_register(*expr.var_reg);
@@ -646,6 +661,7 @@ static inline Option<ExprInfo> compile_func(Shared<ASTNode> node, Shared<Functio
     auto ret = compile_func_inner(node, func, info, global);
     func->num_vars = info.vardec_count;
     func->num_regs = info.next_reg - info.vardec_count;
+    func->code.push_back(0x00);
     return ret;
 }
 static inline Global compile_root(Shared<ASTNode> root)
