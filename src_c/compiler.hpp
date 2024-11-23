@@ -1,5 +1,7 @@
-#ifndef BBEL_COMPILER
-#define BBEL_COMPILER
+#ifndef MUALI_COMPILER
+#define MUALI_COMPILER
+        
+#define FOREACH_USE_IMM
 
 #include <cassert>
 #include <cstring>
@@ -546,8 +548,6 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
     {
         info.push_scope();
         
-        #define USE_IMM
-        
         size_t var_index = info.add_var(*node->children[0]->children[0]->text);
         size_t n = 1;
         if (node->children.size() == 4)
@@ -557,7 +557,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         assert(_expr);
         auto expr = *_expr;
         
-        #ifndef USE_IMM
+        #ifndef FOREACH_USE_IMM
         size_t t_var_index = info.add_var("");
         push_op(func->code, OP_SETIMM);
         push_varlen_int(func->code, t_var_index);
@@ -603,7 +603,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             //int8_t diff8 = diff;
             //memcpy(func->code.data() + offset_pos, &diff8, 1);
             
-            #ifndef USE_IMM
+            #ifndef FOREACH_USE_IMM
             push_op(func->code, OP_JINCILT);
             push_varlen_int(func->code, var_index);
             push_varlen_int(func->code, t_var_index);
@@ -693,4 +693,4 @@ static inline Global compile_root(Shared<ASTNode> root)
     return global;
 }
 
-#endif // BBEL_COMPILER
+#endif // MUALI_COMPILER

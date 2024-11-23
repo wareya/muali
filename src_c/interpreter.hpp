@@ -9,14 +9,17 @@
 #include "grammar.hpp"
 #include "vm_common.hpp"
 
-#define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
-//#define OPHANDLER_ABI extern "C"
+
+//#define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
+#define OPHANDLER_ABI extern "C"
 //#define OPHANDLER_ABI [[clang::preserve_none]]
 //#define OPHANDLER_ABI
 
+#define USE_EXTRA_ASSERTS
 #define INSANELY_UNSAFE_DISABLE_VARLEN_VARREG_ENCODING
 //#define NO_THROW_ALL_DANGER_LETS_GO
 #define DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
+
 
 #ifdef NO_THROW_ALL_DANGER_LETS_GO
 #define ASSERT_THROW(X) { }
@@ -191,6 +194,7 @@ extern "C" uint16_t read_op(const uint8_t * & pc)
 {
     uint16_t c;
     memcpy(&c, pc, 2);
+    c &= (1<<INTERPRETER_OPCODE_TABLE_BITS) - 1;
     //if (*pc >= 0x80) [[likely]]
         //return *pc;
         //return *pc++;
@@ -372,7 +376,7 @@ constexpr OpTable make_opcode_table()
     {
         if (table.t[n] != op_unk)
         {
-            for (uint16_t n2 = 256; n2 != 0; n2 += 256)
+            for (uint32_t n2 = 256; n2 < (1<<INTERPRETER_OPCODE_TABLE_BITS); n2 += 256)
             {
                 table.t[n + n2] = table.t[n];
             }
@@ -538,7 +542,6 @@ OPHANDLER_ABI void op_deci(OPHANDLER_ARGS)
     CALL_NEXT();
 }
 
-#define USE_EXTRA_ASSERTS
 OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
 {
     pc += (OP_JINCILTIMM > 0xFF) ? 2 : 1;

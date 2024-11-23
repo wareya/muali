@@ -1,6 +1,8 @@
 #ifndef MUALI_VM_COMMON
 #define MUALI_VM_COMMON
 
+#define INTERPRETER_OPCODE_TABLE_BITS 16
+
 typedef uint32_t TypeId;
 
 constexpr uint32_t TYPEID_NULL    = 0;
@@ -26,8 +28,6 @@ struct Global {
     ListMap<String, size_t> func_names;
     ListMap<String, size_t> var_names;
 };
-
-#define INTERPRETER_OPCODE_TABLE_BITS 16
 
 constexpr uint8_t OPINFO_CMPE         = 0x00;
 constexpr uint8_t OPINFO_CMPNE        = 0x01;
