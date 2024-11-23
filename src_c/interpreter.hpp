@@ -465,7 +465,13 @@ OPHANDLER_ABI size_t read_varlen_int(const uint8_t * & pc)
 #else
 #ifndef VARLEN_VARREG_8BIT
     size_t ret = *pc++;
-#ifdef VARLEN_VARREG_LZ4LIKE
+#ifdef VARLEN_VARREG_SB15LE
+    if (pc[-1] & 0x80) [[unlikely]]
+        ret ^= *pc++ << 7;
+#elif defined VARLEN_VARREG_SB15
+    if (pc[-1] & 0x80) [[unlikely]]
+        ret = ((ret & 0x7F) << 7) | *pc++;
+#elif defined VARLEN_VARREG_LZ4LIKE
     if (pc[-1] == 0xFF) [[unlikely]]
     {
         while (pc[-1] == 0xFF)

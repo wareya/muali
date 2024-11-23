@@ -12,16 +12,21 @@
 #define INTERPRETER_OPCODE_TABLE_BITS 16 // tune: can be from 12 to 16 (inclusive).
 #endif
 
-//#define VARLEN_VARREG_16BIT
+#define VARLEN_VARREG_16BIT // second-fastest
 //#define VARLEN_VARREG_8BIT // fastest
-// var length if neither defined
-
 // The following defines only affect var-reg operand encoding and not opcode encoding.
+//#define VARLEN_VARREG_SB15 // third-fastest
+// Sign-bit format that only supports up to 32k vars/registers in a single function. You don't need more than that, right?
+// (Faster than VLQ, which is what you get with no defines. Like VLQ, but limited to less length.)
+//#define VARLEN_VARREG_SB15LE
+// Little endian variant. Very very very slightly slower on my zen4 CPU for reasons I do not understand.
 //#define VARLEN_VARREG_LEB128
 // LEB128 is little-endian var length int. otherwise VLQ, which is big endian. VLQ decodes faster, so this should be left disabled.
 //#define VARLEN_VARREG_LZ4LIKE
 // The LZ4 compression algorithm uses a very silly unary-like variable length integer scheme for match lengths.
 // This format can be turned on here. It's slow and big, don't use it.
+
+// If none of the above VARLEN_VARREG... defines are defined, VLQ encoding will be used. SB15 mode is faster.
 
 typedef uint32_t TypeId;
 

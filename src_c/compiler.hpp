@@ -155,8 +155,25 @@ static inline void push_varlen_int(T & buffer, size_t myint)
     buffer.push_back(myint);
     buffer.push_back(myint >> 8);
 #else
-    
-#ifdef VARLEN_VARREG_LZ4LIKE
+
+#ifdef VARLEN_VARREG_SB15LE
+    assert(myint < (1<<15));
+    if (myint >= 0x80)
+    {
+        buffer.push_back((myint & 0x7F) | 0x80);
+        buffer.push_back((myint >> 7) ^ 1);
+    }
+    else
+        buffer.push_back(myint & 0x7F);
+#elif defined VARLEN_VARREG_SB15
+    assert(myint < (1<<15));
+    buffer.push_back(myint & 0x7F);
+    if (myint >= 0x80)
+    {
+        myint >>= 7;
+        buffer.insert_at(buffer.size() - 1, (myint & 0x7F) | 0x80);
+    }
+#elif defined VARLEN_VARREG_LZ4LIKE
     while (myint >= 255)
     {
         myint -= 255;
