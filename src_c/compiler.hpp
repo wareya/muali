@@ -531,20 +531,23 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
     {
         info.push_scope();
         
+        #define USE_IMM
+        
         size_t var_index = info.add_var(*node->children[0]->children[0]->text);
         size_t n = 1;
         if (node->children.size() == 4)
             n = 2;
         
-        size_t t_var_index = info.add_var("");
-        
         auto _expr = compile_func_inner(node->children[n], func, info, global);
         assert(_expr);
         auto expr = *_expr;
         
+        #ifndef USE_IMM
+        size_t t_var_index = info.add_var("");
         func->code.push_back(OP_SETIMM);
         push_varlen_int(func->code, t_var_index);
         push_immediate(func->code, expr);
+        #endif
         
         if (expr.imm_int)
         {
@@ -585,12 +588,15 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             //int8_t diff8 = diff;
             //memcpy(func->code.data() + offset_pos, &diff8, 1);
             
-            //func->code.push_back(OP_JINCILTIMM);
+            #ifndef USE_IMM
             func->code.push_back(OP_JINCILT);
             push_varlen_int(func->code, var_index);
             push_varlen_int(func->code, t_var_index);
-            //push_varlen_int(func->code, j_var_index);
-            //push_u64(func->code, *expr.imm_int);
+            #else
+            func->code.push_back(OP_JINCILTIMM);
+            push_varlen_int(func->code, var_index);
+            push_u64(func->code, *expr.imm_int);
+            #endif
             push_u32(func->code, (ptrdiff_t)offset_pos - (ptrdiff_t)func->code.size());
             //push_u16(func->code, (ptrdiff_t)offset_pos - (ptrdiff_t)func->code.size() + 2);
         }

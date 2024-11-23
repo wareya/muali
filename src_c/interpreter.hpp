@@ -511,6 +511,8 @@ OPHANDLER_ABI void op_deci(OPHANDLER_ARGS)
     }
     CALL_NEXT();
 }
+
+#define USE_EXTRA_ASSERTS
 OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
 {
     {
@@ -519,7 +521,9 @@ OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
         int32_t offset = read_u32(pc);
         //int16_t offset = read_u16(pc);
         
+        #ifdef USE_EXTRA_ASSERTS
         ASSERT_THROW(vars[index].kind == TYPEID_INT);
+        #endif
         vars[index].data.integer += 1;
         
         if (vars[index].data.integer < imm)
@@ -527,7 +531,6 @@ OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
     }
     CALL_NEXT();
 }
-
 OPHANDLER_ABI void op_jincilt(OPHANDLER_ARGS)
 {
     {
@@ -536,7 +539,9 @@ OPHANDLER_ABI void op_jincilt(OPHANDLER_ARGS)
         int32_t offset = read_u32(pc);
         //int16_t offset = read_u16(pc);
         
+        #ifdef USE_EXTRA_ASSERTS
         ASSERT_THROW(vars[index].kind == TYPEID_INT && vars[i_index].kind == TYPEID_INT);
+        #endif
         vars[index].data.integer += 1;
         
         if (vars[index].data.integer < vars[i_index].data.integer)
