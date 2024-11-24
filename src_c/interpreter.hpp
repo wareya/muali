@@ -31,9 +31,9 @@
 #endif
 
 #ifdef OPCODES_ALWAYS_16BIT
-#define INC_PC_FOR_OPCODE(X) pc += 2; (void)global;
+#define INC_PC_FOR_OPCODE(X) pc += 2; (void)global; (void)vars;
 #else
-#define INC_PC_FOR_OPCODE(X) pc += ((X) > 0xFF) ? 2 : 1; (void)global;
+#define INC_PC_FOR_OPCODE(X) pc += ((X) > 0xFF) ? 2 : 1; (void)global; (void)vars;
 #endif
 
 struct Variable {
