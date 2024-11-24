@@ -14,7 +14,7 @@
 #ifndef USE_LOOP_DISPATCH
 #define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
 #else
-#define OPHANDLER_ABI extern "C"
+#define OPHANDLER_ABI
 #endif
 
 #define USE_EXTRA_ASSERTS
@@ -1036,7 +1036,12 @@ OPHANDLER_ABI void op_returnval(OPHANDLER_ARGS)
     {
         auto i = read_varlen_int(pc);
         auto & ret = vars[i];
+        
+#ifdef USE_LOOP_DISPATCH
+        throw std::move(ret);
+#else
         global->retval = std::move(ret);
+#endif
     }
 }
 
@@ -1070,12 +1075,17 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
 #ifdef USE_LOOP_DISPATCH
     while (1)
     {
-        auto f = opcode_table.t[op];
-        f(CALL_ORDER);
-        prev_inst = op;
-        if (f == op_returnval)
-            break;
-        op = read_op(pc);
+        try
+        {
+            auto f = opcode_table.t[op];
+            f(CALL_ORDER);
+            prev_inst = op;
+            op = read_op(pc);
+        }
+        catch (Variable retval)
+        {
+            return retval;
+        }
     }
 #else
     opcode_table.t[op](CALL_ORDER);
