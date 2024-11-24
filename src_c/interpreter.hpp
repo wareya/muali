@@ -9,6 +9,7 @@
 #include "grammar.hpp"
 #include "vm_common.hpp"
 
+#define USE_LOOP_DISPATCH
 
 #define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
 //#define OPHANDLER_ABI extern "C"
@@ -30,9 +31,9 @@
 #endif
 
 #ifdef OPCODES_ALWAYS_16BIT
-#define INC_PC_FOR_OPCODE(X) pc += 2;
+#define INC_PC_FOR_OPCODE(X) pc += 2; (void)global;
 #else
-#define INC_PC_FOR_OPCODE(X) pc += ((X) > 0xFF) ? 2 : 1;
+#define INC_PC_FOR_OPCODE(X) pc += ((X) > 0xFF) ? 2 : 1; (void)global;
 #endif
 
 struct Variable {
@@ -213,11 +214,13 @@ extern "C" uint16_t read_op(const uint8_t * & pc)
 
 
 //#define OPHANDLER_ARGS const uint8_t * pc, Variable * vars, Interpreter * global
-#define OPHANDLER_ARGS Variable * vars, const uint8_t * pc, Interpreter * global
+#define OPHANDLER_ARGS Variable * vars, const uint8_t * & pc, Interpreter * global
 #define CALL_ORDER vars, pc, global
 
+#ifdef USE_LOOP_DISPATCH
+#define CALL_NEXT() { }
+#elif defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
     //global->accum += 1; 
-#ifdef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
 #define CALL_NEXT() \
     { uint16_t c = read_op(pc); [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
 #else
@@ -1053,7 +1056,18 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
     uint16_t prev_inst = read_op(pc);
 #endif
     auto global = this;
+    
+#ifdef USE_LOOP_DISPATCH
+    uint16_t actual_prev_inst;
+    do
+    {
+        actual_prev_inst = prev_inst;
+        opcode_table.t[prev_inst](CALL_ORDER);
+        prev_inst = read_op(pc);
+    } while (actual_prev_inst != OP_RETURNVAL);
+#else
     opcode_table.t[prev_inst](CALL_ORDER);
+#endif
     return std::move(retval);
 }
 
