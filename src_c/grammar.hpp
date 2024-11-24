@@ -94,6 +94,7 @@ static Shared<MatchingRule> new_rule_text(String text)
 
 struct Grammar
 {
+    ListSet<String> reserved_keywords;
     ListSet<Shared<GrammarPoint>> all_points;
     ListMap<String, Shared<GrammarPoint>> points;
     Vec<Shared<MatchingRule>> tokens;
@@ -149,6 +150,7 @@ static auto load_grammar(const char * text) -> Grammar
 {
     assert(text);
     
+    ListSet<String> reserved_keywords;
     ListMap<String, Shared<GrammarPoint>> ret;
     ListSet<Shared<GrammarPoint>> all_points;
     Vec<Shared<MatchingRule>> tokens;
@@ -255,9 +257,24 @@ static auto load_grammar(const char * text) -> Grammar
                 i += 8;
             }
             
-            current_point->name = MakeShared<String>(name);
-            mode = MODE_FORMS;
-            
+            if (name == "RESERVED_KEYWORDS")
+            {
+                while (!line_is_at_eol())
+                {
+                    while (!line_is_at_eol() && line_is_at_space())
+                        i++;
+                    
+                    String name;
+                    while (text[i] != 0 && !line_is_at_eol() && !line_is_at_space())
+                        name += text[i++];
+                    reserved_keywords.insert(name);
+                }
+            }
+            else
+            {
+                current_point->name = MakeShared<String>(name);
+                mode = MODE_FORMS;
+            }
             go_to_next_line();
         }
         else if (mode == MODE_FORMS)
@@ -487,7 +504,11 @@ static auto load_grammar(const char * text) -> Grammar
         }
     }
     
-    return {all_points, ret, tokens, regex_tokens};
+    
+    //for (auto & s : reserved_keywords)
+    //    printf("RESERVED: `%s`\n", s.data());
+    
+    return {reserved_keywords, all_points, ret, tokens, regex_tokens};
 }
 
 struct Token {
@@ -502,7 +523,7 @@ struct Token {
 
 // On success, the token stream is returned.
 // On failure, the tokenization process is returned, with an additional token with null text and regex at the end.
-static Vec<Shared<Token>> tokenize(const Grammar & grammar, const char * _text)
+static Vec<Shared<Token>> tokenize(Grammar & grammar, const char * _text)
 {
     const Vec<Shared<MatchingRule>> & tokens = grammar.tokens;
     Vec<Shared<Token>> ret;
@@ -593,8 +614,21 @@ static Vec<Shared<Token>> tokenize(const Grammar & grammar, const char * _text)
                 int index = token.compiled_regex->match(&text[i], &len);
                 if (index == 0 && (unsigned int)len > longest_found)
                 {
-                    longest_found = len;
-                    found = _token;
+                    bool ok = true;
+                    for (auto & s : grammar.reserved_keywords)
+                    {
+                        if ((size_t)len == s.size() && memcmp(&text[i], s.data(), len) == 0)
+                        {
+                            ok = false;
+                            break;
+                        }
+                    }
+                    if (ok)
+                    {
+                        longest_found = len;
+                        found = _token;
+                        break;
+                    }
                 }
             }
             else if (token.kind == MATCH_KIND_LITERAL)

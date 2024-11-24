@@ -243,8 +243,10 @@ static inline void push_immediate(T & buffer, ExprInfo myimm)
         }
         push_u64(buffer, imm);
     }
+    else if (myimm.imm_null)
+        buffer.push_back(TYPEID_NULL);
     else
-        assert(((void)"TODO string immediate", 0));
+        assert(((void)"TODO more types of immediate", 0));
 }
 
 static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<Function> func, FuncCompInfo & info, const Global & global)

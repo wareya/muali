@@ -51,7 +51,8 @@ int main(int argc, char ** argv)
     }
     
     size_t i = 0;
-    if (0) for (auto n : tokens)
+    //if (0)
+    for (auto n : tokens)
     {
         if (n->from_regex)
             printf("> %zd\t%s (via %s)\n", i, n->text->data(), n->from_regex->str.data());

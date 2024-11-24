@@ -8,4 +8,5 @@ func main():
         //sum += flip / i
     end
     return sum * 4.0
+    //return
 end

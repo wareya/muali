@@ -1,3 +1,5 @@
+RESERVED_KEYWORDS: end if else elif while for return pass goto break continue match switch case
+
 int:
 rx%[0-9]+%rx
 

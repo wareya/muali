@@ -381,6 +381,8 @@ constexpr OpTable make_opcode_table()
     table.t[OP_SHRIMM] = op_shrimm;
     
     table.t[OP_RETURNVAL] = op_returnval;
+    table.t[OP_RETURNIMM] = op_returnimm;
+    
     table.t[OP_J] = op_j;
     table.t[OP_JILTIMM] = op_jiltimm;
     
@@ -1039,6 +1041,20 @@ OPHANDLER_ABI void op_returnval(OPHANDLER_ARGS)
     {
         auto i = read_varlen_int(pc);
         auto & ret = vars[i];
+        
+#ifdef USE_LOOP_DISPATCH
+        throw std::move(ret);
+#else
+        global->retval = std::move(ret);
+#endif
+    }
+}
+
+OPHANDLER_ABI void op_returnimm(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_RETURNIMM);
+    {
+        auto ret = read_immediate(pc);
         
 #ifdef USE_LOOP_DISPATCH
         throw std::move(ret);
