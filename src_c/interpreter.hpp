@@ -25,7 +25,8 @@
 #ifdef NO_THROW_ALL_DANGER_LETS_GO
 #define ASSERT_THROW(X) { }
 #else
-#define ASSERT_THROW(X) { if (!(X)) [[unlikely]] throw; }
+//#define ASSERT_THROW(X) { if (!(X)) [[unlikely]] throw; }
+#define ASSERT_THROW(X) { if (__builtin_expect(!(X), 0)) throw; }
 //#define ASSERT_THROW(X) { if (!(X)) throw; }
 //#define ASSERT_THROW(X) { if (!(X)) throw #X; }
 //#define ASSERT_THROW(X) { assert(X); }
