@@ -213,9 +213,13 @@ extern "C" uint16_t read_op(const uint8_t * & pc)
 }
 
 
-//#define OPHANDLER_ARGS const uint8_t * pc, Variable * vars, Interpreter * global
+#ifdef USE_LOOP_DISPATCH
 #define OPHANDLER_ARGS Variable * vars, const uint8_t * & pc, Interpreter * global
 #define CALL_ORDER vars, pc, global
+#else
+#define OPHANDLER_ARGS Variable * vars, const uint8_t * pc, Interpreter * global
+#define CALL_ORDER vars, pc, global
+#endif
 
 #ifdef USE_LOOP_DISPATCH
 #define CALL_NEXT() { }
