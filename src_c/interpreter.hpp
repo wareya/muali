@@ -225,7 +225,7 @@ extern "C" uint16_t read_op(const uint8_t * & pc)
 
 #ifdef USE_LOOP_DISPATCH
 #define CALL_NEXT() { }
-#elif defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE && !defined USE_LOOP_DISPATCH
+#elif defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
     //global->accum += 1; 
 #define CALL_NEXT() \
     { uint16_t c = read_op(pc); [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
@@ -416,7 +416,7 @@ struct Interpreter {
     
     Variable retval; // return value trampoline
     
-#if (!defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE) || defined USE_LOOP_DISPATCH
+#ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
     uint16_t prev_inst;
 #endif
     
@@ -436,7 +436,7 @@ OPHANDLER_ABI void op_unk(OPHANDLER_ARGS)
     if ((op & 0xFF) >= 0x80)
         op &= 0xFF;
     printf("unknown instruction %04X -- breaking!\n", op);
-#if (!defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE) || defined USE_LOOP_DISPATCH
+#ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
     if ((global->prev_inst & 0xFF) >= 0x80)
         global->prev_inst &= 0xFF;
     printf("previous instruction was %02X\n", global->prev_inst);
@@ -1065,7 +1065,7 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
     
     const uint8_t * pc = func->code.data();
     auto vars = _vars.data();
-#if (!defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE) || defined USE_LOOP_DISPATCH
+#ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
     prev_inst = read_op(pc);
     uint16_t op = prev_inst;
 #else
@@ -1080,7 +1080,9 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
         {
             auto f = opcode_table.t[op];
             f(CALL_ORDER);
+        #ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
             prev_inst = op;
+        #endif
             op = read_op(pc);
         }
         catch (Variable retval)
