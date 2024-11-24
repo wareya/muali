@@ -11,10 +11,11 @@
 
 //#define USE_LOOP_DISPATCH
 
+#ifndef USE_LOOP_DISPATCH
 #define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
-//#define OPHANDLER_ABI extern "C"
-//#define OPHANDLER_ABI [[clang::preserve_none]]
-//#define OPHANDLER_ABI
+#else
+#define OPHANDLER_ABI extern "C"
+#endif
 
 #define USE_EXTRA_ASSERTS
 //#define NO_THROW_ALL_DANGER_LETS_GO
