@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-clang++ --std=c++20 -O1 -Wall -Wextra src_c/main.cpp -fprofile-generate -fuse-ld=lld
+clang++ --std=c++20 -O1 src_c/main.cpp -fprofile-generate -fuse-ld=lld
 LLVM_PROFILE_FILE=raw.profraw  ./a.exe testshort.mua
 llvm-profdata merge -output=merged.profdata raw.profraw
-clang++ --std=c++20 -O3 -Wall -Wextra -g -ggdb -mtune=generic src_c/main.cpp -fprofile-use=merged.profdata
+clang++ --std=c++20 -O3 -Wall -Wextra -pedantic -g -ggdb src_c/main.cpp -fprofile-use=merged.profdata
