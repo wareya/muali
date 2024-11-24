@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
 clang++ --std=c++20 -O1 -Wall -Wextra src_c/main.cpp -fprofile-generate -fuse-ld=lld
-time ./a.exe test.mua
+time ./a.exe testshort.mua
 llvm-profdata merge -output=merged.profdata *.profraw
 clang++ --std=c++20 -O3 -Wall -Wextra -g -ggdb -mtune=rocketlake src_c/main.cpp -fprofile-use=merged.profdata

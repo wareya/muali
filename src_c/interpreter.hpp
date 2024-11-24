@@ -223,7 +223,7 @@ extern "C" uint16_t read_op(const uint8_t * & pc)
 
 #ifdef USE_LOOP_DISPATCH
 #define CALL_NEXT() { }
-#elif defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
+#elif defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE && !defined USE_LOOP_DISPATCH
     //global->accum += 1; 
 #define CALL_NEXT() \
     { uint16_t c = read_op(pc); [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
@@ -414,7 +414,7 @@ struct Interpreter {
     
     Variable retval; // return value trampoline
     
-#ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
+#if (!defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE) || defined USE_LOOP_DISPATCH
     uint16_t prev_inst;
 #endif
     
@@ -428,11 +428,15 @@ struct Interpreter {
 
 OPHANDLER_ABI void op_unk(OPHANDLER_ARGS)
 {
-    //INC_PC_FOR_OPCODE(OP_UNK);
     (void)vars;
     (void)global;
-    printf("unknown instruction %02X -- breaking!\n", *(pc-1));
-#ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
+    uint16_t op = read_op(pc);
+    if ((op & 0xFF) >= 0x80)
+        op &= 0xFF;
+    printf("unknown instruction %04X -- breaking!\n", op);
+#if (!defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE) || defined USE_LOOP_DISPATCH
+    if ((global->prev_inst & 0xFF) >= 0x80)
+        global->prev_inst &= 0xFF;
     printf("previous instruction was %02X\n", global->prev_inst);
 #endif
     throw;
@@ -1054,23 +1058,26 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
     
     const uint8_t * pc = func->code.data();
     auto vars = _vars.data();
-#ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
+#if (!defined DO_NOT_TRACK_INTERPRETER_PREV_OPCODE) || defined USE_LOOP_DISPATCH
     prev_inst = read_op(pc);
+    uint16_t op = prev_inst;
 #else
-    uint16_t prev_inst = read_op(pc);
+    uint16_t op = read_op(pc);
 #endif
     auto global = this;
     
 #ifdef USE_LOOP_DISPATCH
-    uint16_t actual_prev_inst;
-    do
+    while (1)
     {
-        actual_prev_inst = prev_inst;
-        opcode_table.t[prev_inst](CALL_ORDER);
-        prev_inst = read_op(pc);
-    } while (actual_prev_inst != OP_RETURNVAL);
+        auto f = opcode_table.t[op];
+        f(CALL_ORDER);
+        prev_inst = op;
+        if (f == op_returnval)
+            break;
+        op = read_op(pc);
+    }
 #else
-    opcode_table.t[prev_inst](CALL_ORDER);
+    opcode_table.t[op](CALL_ORDER);
 #endif
     return std::move(retval);
 }
