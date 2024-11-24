@@ -360,7 +360,7 @@ DEC_HANDLER(op_unk);
 
 constexpr OpTable make_opcode_table()
 {
-    OpTable table;
+    OpTable table = {};
     for (size_t i = 0; i < (1<<INTERPRETER_OPCODE_TABLE_BITS); i++)
         table.t[i] = op_unk;
     
