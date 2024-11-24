@@ -414,7 +414,9 @@ struct Interpreter {
     ListMap<String, size_t> func_names;
     ListMap<String, size_t> var_names;
     
+#ifndef USE_LOOP_DISPATCH
     Variable retval; // return value trampoline
+#endif
     
 #ifndef DO_NOT_TRACK_INTERPRETER_PREV_OPCODE
     uint16_t prev_inst;
@@ -1074,9 +1076,9 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
     auto global = this;
     
 #ifdef USE_LOOP_DISPATCH
-    while (1)
+    try
     {
-        try
+        while (1)
         {
             auto f = opcode_table.t[op];
             f(CALL_ORDER);
@@ -1085,15 +1087,17 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
         #endif
             op = read_op(pc);
         }
-        catch (Variable retval)
-        {
-            return retval;
-        }
+    }
+    catch (Variable retval)
+    {
+        return retval;
     }
 #else
     opcode_table.t[op](CALL_ORDER);
 #endif
+#ifndef USE_LOOP_DISPATCH
     return std::move(retval);
+#endif
 }
 
 inline Variable Interpreter::call_func_by_name(String funcname, Vec<Variable> args)
