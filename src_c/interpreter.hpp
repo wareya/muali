@@ -9,7 +9,7 @@
 #include "grammar.hpp"
 #include "vm_common.hpp"
 
-#define USE_LOOP_DISPATCH
+//#define USE_LOOP_DISPATCH
 
 #define OPHANDLER_ABI extern "C" [[clang::preserve_none]]
 //#define OPHANDLER_ABI extern "C"
