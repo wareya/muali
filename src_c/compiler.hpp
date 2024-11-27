@@ -147,7 +147,7 @@ struct FuncCompInfo {
 template<typename T>
 static inline void push_op(T & buffer, uint16_t op)
 {
-    //printf("pushing op %02X...\n", op);
+    printf("pushing op %02X...\n", op);
 #ifdef OPCODES_ALWAYS_8BIT
     assert(op <= 0xFF);
     buffer.push_back(uint8_t(op));
@@ -485,7 +485,11 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 opcode = OP_MULIMM;
             else if (op == "/" && !expr2.is_immediate())
             {
-                if (expr1.static_type == TYPEID_FLOAT)
+                if (expr1.static_type == TYPEID_FLOAT && expr2.static_type == TYPEID_FLOAT)
+                    opcode = OP_DIV_FF;
+                else if (expr1.static_type == TYPEID_FLOAT && expr2.static_type == TYPEID_INT)
+                    opcode = OP_DIV_FI;
+                else if (expr1.static_type == TYPEID_FLOAT)
                     opcode = OP_DIV_F;
                 else
                     opcode = OP_DIV;

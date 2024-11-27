@@ -267,6 +267,8 @@ DEC_HANDLER(op_set_f);
 DEC_HANDLER(op_subimm_i);
 
 DEC_HANDLER(op_div_f);
+DEC_HANDLER(op_div_ff);
+DEC_HANDLER(op_div_fi);
 DEC_HANDLER(op_add_f);
 DEC_HANDLER(op_add_ff);
 DEC_HANDLER(op_negate_f);
@@ -404,6 +406,8 @@ constexpr OpTable make_opcode_table()
     _INSERT_OP_FUNC(OP_ADD_F, op_add_f);
     _INSERT_OP_FUNC(OP_ADD_FF, op_add_ff);
     _INSERT_OP_FUNC(OP_DIV_F, op_div_f);
+    _INSERT_OP_FUNC(OP_DIV_FF, op_div_ff);
+    _INSERT_OP_FUNC(OP_DIV_FI, op_div_fi);
     
     _INSERT_OP_FUNC(OP_RETURNVAL, op_returnval);
     _INSERT_OP_FUNC(OP_RETURNIMM, op_returnimm);
@@ -1084,6 +1088,35 @@ OPHANDLER_ABI void op_div_f(OPHANDLER_ARGS)
             printf("%02X vs %02X (indexes %zu %zu) \n", var1.kind, var2.kind, i_in1, i_in2);
             ASSERT_THROW(((void)"unknown type pair for / operator", 0));
         }
+    }
+    CALL_NEXT();
+}
+template <typename F> void op_trivial_infix_impl(OPHANDLER_ARGS, F f)
+{
+    auto i_in1 = read_varlen_int(pc);
+    auto i_in2 = read_varlen_int(pc);
+    auto & var1 = vars[i_in1];
+    auto & var2 = vars[i_in2];
+    f(var1, var2, global);
+}
+OPHANDLER_ABI void op_div_ff(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_DIV_FF);
+    op_trivial_infix_impl<>(CALL_ORDER, [](Variable & a, Variable & b, Interpreter *)
+    {
+        a.data.real /= b.data.real;
+    });
+    CALL_NEXT();
+}
+OPHANDLER_ABI void op_div_fi(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_DIV_FI);
+    {
+        auto i_in1 = read_varlen_int(pc);
+        auto i_in2 = read_varlen_int(pc);
+        auto & var1 = vars[i_in1];
+        auto & var2 = vars[i_in2];
+        var1.data.real /= var2.data.integer;
     }
     CALL_NEXT();
 }

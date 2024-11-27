@@ -67,6 +67,8 @@ constexpr uint16_t OP_SET_F            = 0x812;
 constexpr uint16_t OP_ADD_F            = 0x814;
 constexpr uint16_t OP_ADD_FF           = 0x824;
 constexpr uint16_t OP_DIV_F            = 0x81A;
+constexpr uint16_t OP_DIV_FI           = 0x84A;
+constexpr uint16_t OP_DIV_FF           = 0x85A;
 
 constexpr uint16_t OP_SHLIMM_I         = 0x906;
 
