@@ -20,7 +20,7 @@ struct ExprInfo {
     Option<size_t> global_var;
     Option<size_t> func_name;
     
-    Option<TypeId> static_type;
+    TypeId static_type = TYPEID_INVALID;
     
     bool is_var_reg()
     {
@@ -147,6 +147,7 @@ struct FuncCompInfo {
 template<typename T>
 static inline void push_op(T & buffer, uint16_t op)
 {
+    //printf("pushing op %02X...\n", op);
 #ifdef OPCODES_ALWAYS_8BIT
     assert(op <= 0xFF);
     buffer.push_back(uint8_t(op));
@@ -277,7 +278,7 @@ static inline void push_immediate(T & buffer, ExprInfo myimm)
 static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<Function> func, FuncCompInfo & info, const Global & global)
 {
     assert(node->text);
-    //printf("%s\n", node->text->data());
+    //printf("inside of... %s\n", node->text->data());
     if (*node->text == "funcdef")
     {
         //for (auto _node : node->children[1]->children.size())
@@ -382,7 +383,9 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             throw;
         }
         //printf("looked up %s.... found at %zu!!!\n", node->children[0]->text->data(), var_index);
-        return {ExprInfo::from_var_reg(var_index)};
+        auto ret = ExprInfo::from_var_reg(var_index);
+        ret.static_type = info.get_var_type(var_index);
+        return {ret};
     }
     else if (node->text->starts_with("base_unexp"))
     {
@@ -423,7 +426,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 else if (*text == "-")
                 {
                     assert(ret->is_var_reg());
-                    if (info.get_var_type(*ret->var_reg) == TYPEID_FLOAT)
+                    if (ret->static_type == TYPEID_FLOAT)
                         push_op(func->code, OP_NEGATE_F);
                     else
                         push_op(func->code, OP_NEGATE);
@@ -463,7 +466,9 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             uint16_t opcode;
             if (op == "+" && !expr2.is_immediate())
             {
-                if (expr1.is_var_reg() && info.get_var_type(*expr1.var_reg) == TYPEID_FLOAT)
+                if (expr1.static_type == TYPEID_FLOAT && expr2.static_type == TYPEID_FLOAT)
+                    opcode = OP_ADD_FF;
+                else if (expr1.static_type == TYPEID_FLOAT)
                     opcode = OP_ADD_F;
                 else
                     opcode = OP_ADD;
@@ -479,14 +484,19 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             else if (op == "*" && expr2.is_immediate())
                 opcode = OP_MULIMM;
             else if (op == "/" && !expr2.is_immediate())
-                opcode = OP_DIV;
+            {
+                if (expr1.static_type == TYPEID_FLOAT)
+                    opcode = OP_DIV_F;
+                else
+                    opcode = OP_DIV;
+            }
             else if (op == "/" && expr2.is_immediate())
                 opcode = OP_DIVIMM;
             else if (op == "<<" && !expr2.is_immediate())
                 opcode = OP_SHL;
             else if (op == "<<" && expr2.is_immediate())
             {
-                if (expr1.is_var_reg() && info.get_var_type(*expr1.var_reg) == TYPEID_INT)
+                if (expr1.is_var_reg() && expr1.static_type == TYPEID_INT)
                     opcode = OP_SHLIMM_I;
                 else
                     opcode = OP_SHLIMM;
@@ -502,6 +512,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 info.free_register(*expr1.var_reg); // does nothing if passed a variable
             
             size_t out_reg = info.alloc_register();
+            auto ret = ExprInfo::from_var_reg(out_reg);
             
             if (!expr1.is_var_reg())
             {
@@ -510,31 +521,46 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                     push_op(func->code, OP_SETIMM);
                     push_varlen_int(func->code, out_reg);
                     push_immediate(func->code, expr1);
-                    expr1 = ExprInfo::from_var_reg(out_reg);
+                    ret.static_type = expr1.static_type;
+                    expr1 = ret;
                 }
                 else
-                    assert(((void)"tried to multiply with an unsupported type", 0));
+                    assert(((void)"tried to operate on an unsupported type of immediate", 0));
             }
             else if (*expr1.var_reg != out_reg)
             {
-                push_op(func->code, OP_SET);
+                if (expr1.static_type == TYPEID_INT)
+                    push_op(func->code, OP_SET_I);
+                else if (expr1.static_type == TYPEID_FLOAT)
+                    push_op(func->code, OP_SET_F);
+                else
+                    push_op(func->code, OP_SET);
                 push_varlen_int(func->code, out_reg);
                 push_varlen_int(func->code, *expr1.var_reg);
+                //printf("????? %d %d\n", out_reg, *expr1.var_reg);
+                //out_reg.static_type = expr1.static_type;
             }
             
             if (expr2.imm_int)
             {
                 if (op == "-" && *expr2.imm_int == 1)
                 {
-                    push_op(func->code, OP_DECI);
+                    if (expr1.static_type == TYPEID_INT)
+                        push_op(func->code, OP_DECI_INT);
+                    else
+                        push_op(func->code, OP_DECI);
                     push_varlen_int(func->code, out_reg);
-                    return {ExprInfo::from_var_reg(out_reg)};
+                    auto ret = ExprInfo::from_var_reg(out_reg);
+                    ret.static_type = expr1.static_type;
+                    return {ret};
                 }
                 if (op == "+" && *expr2.imm_int == 1)
                 {
                     push_op(func->code, OP_INCI);
                     push_varlen_int(func->code, out_reg);
-                    return {ExprInfo::from_var_reg(out_reg)};
+                    auto ret = ExprInfo::from_var_reg(out_reg);
+                    ret.static_type = expr1.static_type;
+                    return {ret};
                 }
             }
             
@@ -551,7 +577,12 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             if (expr2.is_var_reg())
                 info.free_register(*expr2.var_reg);
             
-            return {ExprInfo::from_var_reg(out_reg)};
+            if (expr1.static_type == TYPEID_FLOAT)
+                ret.static_type = TYPEID_FLOAT;
+            if (expr1.static_type == TYPEID_INT)
+                ret.static_type = TYPEID_INT;
+            
+            return ret;
         }
     }
     else if (*node->text == "assign_binop")
@@ -572,9 +603,16 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         auto & op = *node->children[1]->children[0]->text;
         
         //printf("%s\n", op.data());
-        uint8_t opcode;
+        uint16_t opcode;
         if (op == "+=" && !expr2.is_immediate())
-            opcode = OP_ADD;
+        {
+            if (info.get_var_type(var_index) == TYPEID_FLOAT && expr2.static_type == TYPEID_FLOAT)
+                opcode = OP_ADD_FF;
+            else if (info.get_var_type(var_index) == TYPEID_FLOAT)
+                opcode = OP_ADD_F;
+            else
+                opcode = OP_ADD;
+        }
         else if (op == "+=" && expr2.is_immediate())
             opcode = OP_ADDIMM;
         else if (op == "-=" && !expr2.is_immediate())
@@ -746,7 +784,10 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             push_varlen_int(func->code, var_index);
             push_varlen_int(func->code, t_var_index);
             #else
-            push_op(func->code, OP_JINCILTIMM);
+            if (info.get_var_type(var_index) == TYPEID_INT)
+                push_op(func->code, OP_JINCILTIMM_INT);
+            else
+                push_op(func->code, OP_JINCILTIMM);
             push_varlen_int(func->code, var_index);
             push_u64(func->code, *expr.imm_int);
             #endif

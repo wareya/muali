@@ -61,13 +61,12 @@ constexpr uint8_t OPINFO_CMPLT        = 0x03;
 constexpr uint8_t OPINFO_CMPGTE       = 0x04;
 constexpr uint8_t OPINFO_CMPLTE       = 0x05;
 
-
-// giving these high indexes for testing
-constexpr uint16_t OP_SET              = 0x802;
-constexpr uint16_t OP_SETIMM           = 0x803;
-
+constexpr uint16_t OP_SET_I            = 0x802;
 constexpr uint16_t OP_SUBIMM_I         = 0x807;
+constexpr uint16_t OP_SET_F            = 0x812;
 constexpr uint16_t OP_ADD_F            = 0x814;
+constexpr uint16_t OP_ADD_FF           = 0x824;
+constexpr uint16_t OP_DIV_F            = 0x81A;
 
 constexpr uint16_t OP_SHLIMM_I         = 0x906;
 
@@ -89,6 +88,9 @@ constexpr uint16_t OP_FTOIBITS         = 0xF03;
 constexpr uint16_t OP_ITOFBITS         = 0xF04;
 
 constexpr uint16_t OP_FAULT            = 0xFF;
+
+constexpr uint16_t OP_SET              = 0x82;
+constexpr uint16_t OP_SETIMM           = 0x83;
 
 constexpr uint16_t OP_ADD              = 0x84;
 constexpr uint16_t OP_ADDIMM           = 0x85;

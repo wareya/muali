@@ -26,7 +26,8 @@
 #define ASSERT_THROW(X) { }
 #else
 //#define ASSERT_THROW(X) { if (!(X)) [[unlikely]] throw; }
-#define ASSERT_THROW(X) { if (__builtin_expect(!(X), 0)) throw; }
+//#define ASSERT_THROW(X) { if (__builtin_expect(!(X), 0)) throw; }
+#define ASSERT_THROW(X) { if (__builtin_expect(!(X), 0)) assert(X); }
 //#define ASSERT_THROW(X) { if (!(X)) throw; }
 //#define ASSERT_THROW(X) { if (!(X)) throw #X; }
 //#define ASSERT_THROW(X) { assert(X); }
@@ -243,7 +244,6 @@ struct OpTable {
     OpHandler t[(1<<INTERPRETER_OPCODE_TABLE_BITS)];
 };
 
-
 #define DEC_HANDLER(X) OPHANDLER_ABI void X(OPHANDLER_ARGS)
 
 DEC_HANDLER(op_set);
@@ -262,9 +262,13 @@ DEC_HANDLER(op_mulimm);
 DEC_HANDLER(op_divimm);
 DEC_HANDLER(op_modimm);
 
+DEC_HANDLER(op_set_i);
+DEC_HANDLER(op_set_f);
 DEC_HANDLER(op_subimm_i);
 
+DEC_HANDLER(op_div_f);
 DEC_HANDLER(op_add_f);
+DEC_HANDLER(op_add_ff);
 DEC_HANDLER(op_negate_f);
 
 DEC_HANDLER(op_inci_int);
@@ -378,6 +382,8 @@ constexpr OpTable make_opcode_table()
     #define _INSERT_OP_FUNC(X, Y) { assert(table.t[X] == op_unk); table.t[X] = Y; }
     
     _INSERT_OP_FUNC(OP_SET, op_set);
+    _INSERT_OP_FUNC(OP_SET_I, op_set_i);
+    _INSERT_OP_FUNC(OP_SET_F, op_set_f);
     _INSERT_OP_FUNC(OP_SETIMM, op_setimm);
     _INSERT_OP_FUNC(OP_SETZEROI, op_setzeroi);
     _INSERT_OP_FUNC(OP_ADD, op_add);
@@ -396,6 +402,8 @@ constexpr OpTable make_opcode_table()
     _INSERT_OP_FUNC(OP_SHRIMM, op_shrimm);
     
     _INSERT_OP_FUNC(OP_ADD_F, op_add_f);
+    _INSERT_OP_FUNC(OP_ADD_FF, op_add_ff);
+    _INSERT_OP_FUNC(OP_DIV_F, op_div_f);
     
     _INSERT_OP_FUNC(OP_RETURNVAL, op_returnval);
     _INSERT_OP_FUNC(OP_RETURNIMM, op_returnimm);
@@ -474,6 +482,7 @@ Variable read_immediate(const uint8_t * & pc)
     auto c = *pc;
     pc++;
     auto ret = Variable::of_type(c);
+    //printf("made var with type %d\n", c);
     switch (c)
     {
     case TYPEID_NULL:
@@ -721,6 +730,7 @@ OPHANDLER_ABI void op_setimm(OPHANDLER_ARGS)
     {
         auto index = read_varlen_int(pc);
         auto var = read_immediate(pc);
+        //printf("wrote var to %d\n", index);
         vars[index] = var;
     }
     CALL_NEXT();
@@ -731,8 +741,33 @@ OPHANDLER_ABI void op_set(OPHANDLER_ARGS)
     {
         auto index = read_varlen_int(pc);
         auto varindex = read_varlen_int(pc);
-        //printf("writing to index %zu from index %zu....\n", index, varindex);
         vars[index] = vars[varindex];
+    }
+    CALL_NEXT();
+}
+
+OPHANDLER_ABI void op_set_i(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_SET_I);
+    {
+        auto index = read_varlen_int(pc);
+        auto varindex = read_varlen_int(pc);
+        ASSERT_THROW(((void)"tried to assign non-int to int variable/register", vars[varindex].kind == TYPEID_INT));
+        vars[index].kind = TYPEID_INT;
+        vars[index].data.integer = vars[varindex].data.integer;
+    }
+    CALL_NEXT();
+}
+
+OPHANDLER_ABI void op_set_f(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_SET_F);
+    {
+        auto index = read_varlen_int(pc);
+        auto varindex = read_varlen_int(pc);
+        ASSERT_THROW(((void)"tried to assign non-float to float variable/register", vars[varindex].kind == TYPEID_FLOAT));
+        vars[index].kind = TYPEID_FLOAT;
+        vars[index].data.real = vars[varindex].data.real;
     }
     CALL_NEXT();
 }
@@ -797,6 +832,18 @@ OPHANDLER_ABI void op_add_f(OPHANDLER_ARGS)
             var1.data.real += var2.data.real;
         else
             ASSERT_THROW(((void)"unknown type pair for + operator", 0));
+    }
+    CALL_NEXT();
+}
+OPHANDLER_ABI void op_add_ff(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_ADD_FF);
+    {
+        auto i_in1 = read_varlen_int(pc);
+        auto i_in2 = read_varlen_int(pc);
+        auto & var1 = vars[i_in1];
+        auto & var2 = vars[i_in2];
+        var1.data.real += var2.data.real;
     }
     CALL_NEXT();
 }
@@ -1001,24 +1048,39 @@ OPHANDLER_ABI void op_div(OPHANDLER_ARGS)
         auto i_in2 = read_varlen_int(pc);
         auto & var1 = vars[i_in1];
         auto & var2 = vars[i_in2];
-        switch (var1.kind)
+        if (var1.kind == TYPEID_INT && var2.kind == TYPEID_INT)
+            var1.data.integer /= var2.data.integer;
+        else if (var1.kind == TYPEID_INT && var2.kind == TYPEID_FLOAT)
         {
-        case TYPEID_INT:
-            if (var2.kind == TYPEID_INT)
-                var1.data.integer /= var2.data.integer;
-            else if (var2.kind == TYPEID_FLOAT)
-            {
-                var1.kind = TYPEID_FLOAT;
-                var1.data.real = var1.data.integer / var2.data.real;
-            }
-            break;
-        case TYPEID_FLOAT:
-            if (var2.kind == TYPEID_INT)
-                var1.data.real /= var2.data.integer;
-            else if (var2.kind == TYPEID_FLOAT)
-                var1.data.real /= var2.data.real;
-            break;
-        default:
+            var1.kind = TYPEID_FLOAT;
+            var1.data.real = var1.data.integer / var2.data.real;
+        }
+        else if (var1.kind == TYPEID_FLOAT && var2.kind == TYPEID_INT)
+            var1.data.real /= var2.data.integer;
+        else if (var1.kind == TYPEID_FLOAT && var2.kind == TYPEID_FLOAT)
+            var1.data.real /= var2.data.real;
+        else
+        {
+            printf("%02X vs %02X (indexes %zu %zu) \n", var1.kind, var2.kind, i_in1, i_in2);
+            ASSERT_THROW(((void)"unknown type pair for / operator", 0));
+        }
+    }
+    CALL_NEXT();
+}
+OPHANDLER_ABI void op_div_f(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_DIV_F);
+    {
+        auto i_in1 = read_varlen_int(pc);
+        auto i_in2 = read_varlen_int(pc);
+        auto & var1 = vars[i_in1];
+        auto & var2 = vars[i_in2];
+        if (var2.kind == TYPEID_INT)
+            var1.data.real /= var2.data.integer;
+        else if (var2.kind == TYPEID_FLOAT)
+            var1.data.real /= var2.data.real;
+        else
+        {
             printf("%02X vs %02X (indexes %zu %zu) \n", var1.kind, var2.kind, i_in1, i_in2);
             ASSERT_THROW(((void)"unknown type pair for / operator", 0));
         }

@@ -268,7 +268,6 @@ public:
     constexpr T & operator*() noexcept { return *(T*)data; }
     constexpr const T * operator->() const noexcept { return (T*)data; }
     constexpr T * operator->() noexcept { return (T*)data; }
-    Option & operator=(Option &&) = default;
     
     constexpr Option() noexcept { }
     
@@ -291,6 +290,25 @@ public:
         if (other.isok)
             ::new((void*)(T*)data) T(*(T*)other.data);
         isok = other.isok;
+    }
+    Option & operator=(Option && other)
+    {
+        if (isok)
+            (*(T*)data).~T();
+        if (other.isok)
+            ::new((void*)(T*)data) T(std::move(*(T*)other.data));
+        isok = other.isok;
+        return *this;
+    }
+    
+    Option & operator=(const Option & other)
+    {
+        if (isok)
+            (*(T*)data).~T();
+        if (other.isok)
+            ::new((void*)(T*)data) T(*(T*)other.data);
+        isok = other.isok;
+        return *this;
     }
     
     ~Option()
