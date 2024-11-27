@@ -229,10 +229,12 @@ extern "C" uint16_t read_op(const uint8_t * & pc)
     //global->accum += 1; 
 #define CALL_NEXT() \
     { uint16_t c = read_op(pc); [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
+    //{ uint16_t c = read_op(pc); [[clang::musttail]] [[clang::noinline]] return opcode_table.t[c](CALL_ORDER); }
 #else
 #define CALL_NEXT() \
     if (opcode_table.t[*pc] != op_unk) global->prev_inst = *pc;\
     { uint16_t c = read_op(pc); [[clang::musttail]] return opcode_table.t[c](CALL_ORDER); }
+    //{ uint16_t c = read_op(pc); [[clang::musttail]] [[clang::noinline]] return opcode_table.t[c](CALL_ORDER); }
 #endif
 
 struct Interpreter;
@@ -259,14 +261,21 @@ DEC_HANDLER(op_subimm);
 DEC_HANDLER(op_mulimm);
 DEC_HANDLER(op_divimm);
 DEC_HANDLER(op_modimm);
-DEC_HANDLER(op_inciimm);
-DEC_HANDLER(op_deciimm);
+
+DEC_HANDLER(op_subimm_i);
+
+DEC_HANDLER(op_add_f);
+DEC_HANDLER(op_negate_f);
+
+DEC_HANDLER(op_inci_int);
+DEC_HANDLER(op_deci_int);
 
 DEC_HANDLER(op_incf);
 DEC_HANDLER(op_decf);
 
 DEC_HANDLER(op_jincilt);
 DEC_HANDLER(op_jinciltimm);
+DEC_HANDLER(op_jinciltimm_int);
 
 DEC_HANDLER(op_bitand);
 DEC_HANDLER(op_bitor);
@@ -278,6 +287,7 @@ DEC_HANDLER(op_bitandimm);
 DEC_HANDLER(op_bitorimm);
 DEC_HANDLER(op_bitxorimm);
 DEC_HANDLER(op_shlimm);
+DEC_HANDLER(op_shlimm_i);
 DEC_HANDLER(op_shrimm);
 
 DEC_HANDLER(op_negate);
@@ -364,33 +374,43 @@ constexpr OpTable make_opcode_table()
     for (size_t i = 0; i < (1<<INTERPRETER_OPCODE_TABLE_BITS); i++)
         table.t[i] = op_unk;
     
-    table.t[OP_SET] = op_set;
-    table.t[OP_SETIMM] = op_setimm;
-    table.t[OP_SETZEROI] = op_setzeroi;
-    table.t[OP_ADD] = op_add;
-    table.t[OP_ADDIMM] = op_addimm;
-    table.t[OP_SUB] = op_sub;
-    table.t[OP_SUBIMM] = op_subimm;
-    table.t[OP_MUL] = op_mul;
-    table.t[OP_MULIMM] = op_mulimm;
-    table.t[OP_DIV] = op_div;
-    table.t[OP_DIVIMM] = op_divimm;
-    table.t[OP_SHL] = op_shl;
-    table.t[OP_SHLIMM] = op_shlimm;
-    table.t[OP_SHR] = op_shr;
-    table.t[OP_SHRIMM] = op_shrimm;
+    //#define _INSERT_OP_FUNC(X, Y) table.t[X] = Y;
+    #define _INSERT_OP_FUNC(X, Y) { assert(table.t[X] == op_unk); table.t[X] = Y; }
     
-    table.t[OP_RETURNVAL] = op_returnval;
-    table.t[OP_RETURNIMM] = op_returnimm;
+    _INSERT_OP_FUNC(OP_SET, op_set);
+    _INSERT_OP_FUNC(OP_SETIMM, op_setimm);
+    _INSERT_OP_FUNC(OP_SETZEROI, op_setzeroi);
+    _INSERT_OP_FUNC(OP_ADD, op_add);
+    _INSERT_OP_FUNC(OP_ADDIMM, op_addimm);
+    _INSERT_OP_FUNC(OP_SUB, op_sub);
+    _INSERT_OP_FUNC(OP_SUBIMM, op_subimm);
+    _INSERT_OP_FUNC(OP_SUBIMM_I, op_subimm_i);
+    _INSERT_OP_FUNC(OP_MUL, op_mul);
+    _INSERT_OP_FUNC(OP_MULIMM, op_mulimm);
+    _INSERT_OP_FUNC(OP_DIV, op_div);
+    _INSERT_OP_FUNC(OP_DIVIMM, op_divimm);
+    _INSERT_OP_FUNC(OP_SHL, op_shl);
+    _INSERT_OP_FUNC(OP_SHLIMM, op_shlimm);
+    _INSERT_OP_FUNC(OP_SHLIMM_I, op_shlimm_i);
+    _INSERT_OP_FUNC(OP_SHR, op_shr);
+    _INSERT_OP_FUNC(OP_SHRIMM, op_shrimm);
     
-    table.t[OP_J] = op_j;
-    table.t[OP_JILTIMM] = op_jiltimm;
+    _INSERT_OP_FUNC(OP_ADD_F, op_add_f);
     
-    table.t[OP_INCI] = op_inci;
-    table.t[OP_DECI] = op_deci;
-    table.t[OP_JINCILTIMM] = op_jinciltimm;
-    table.t[OP_JINCILT] = op_jincilt;
-    table.t[OP_NEGATE] = op_negate;
+    _INSERT_OP_FUNC(OP_RETURNVAL, op_returnval);
+    _INSERT_OP_FUNC(OP_RETURNIMM, op_returnimm);
+    
+    _INSERT_OP_FUNC(OP_J, op_j);
+    _INSERT_OP_FUNC(OP_JILTIMM, op_jiltimm);
+    
+    _INSERT_OP_FUNC(OP_INCI, op_inci);
+    _INSERT_OP_FUNC(OP_DECI, op_deci);
+    _INSERT_OP_FUNC(OP_DECI_INT, op_deci_int);
+    _INSERT_OP_FUNC(OP_JINCILTIMM, op_jinciltimm);
+    _INSERT_OP_FUNC(OP_JINCILTIMM_INT, op_jinciltimm_int);
+    _INSERT_OP_FUNC(OP_JINCILT, op_jincilt);
+    _INSERT_OP_FUNC(OP_NEGATE, op_negate);
+    _INSERT_OP_FUNC(OP_NEGATE_F, op_negate_f);
     
 #ifndef OPCODES_ALWAYS_16BIT
     for (uint16_t n = 0; n < 256; n++)
@@ -592,6 +612,15 @@ OPHANDLER_ABI void op_deci(OPHANDLER_ARGS)
     }
     CALL_NEXT();
 }
+OPHANDLER_ABI void op_deci_int(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_DECI_INT);
+    {
+        auto index = read_varlen_int(pc);
+        vars[index].data.integer -= 1;
+    }
+    CALL_NEXT();
+}
 
 OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
 {
@@ -603,6 +632,24 @@ OPHANDLER_ABI void op_jinciltimm(OPHANDLER_ARGS)
         ASSERT_THROW(vars[index].kind == TYPEID_INT);
         #endif
         
+        int64_t imm = read_u64(pc);
+        
+        if (vars[index].data.integer + 1 < imm)
+        {
+            int32_t offset = read_u32(pc);
+            pc += offset;
+        }
+        else
+            pc += 4;
+        vars[index].data.integer += 1;
+    }
+    CALL_NEXT();
+}
+OPHANDLER_ABI void op_jinciltimm_int(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_JINCILTIMM_INT);
+    {
+        auto index = read_varlen_int(pc);
         int64_t imm = read_u64(pc);
         
         if (vars[index].data.integer + 1 < imm)
@@ -653,6 +700,17 @@ OPHANDLER_ABI void op_negate(OPHANDLER_ARGS)
         default:
             ASSERT_THROW(((void)"unknown type pair for + operator", 0));
         }
+    }
+    CALL_NEXT();
+}
+
+OPHANDLER_ABI void op_negate_f(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_NEGATE_F);
+    {
+        auto index = read_varlen_int(pc);
+        auto & var = vars[index];
+        var.data.real = -var.data.real;
     }
     CALL_NEXT();
 }
@@ -722,6 +780,23 @@ OPHANDLER_ABI void op_add(OPHANDLER_ARGS)
         default:
             ASSERT_THROW(((void)"unknown type pair for + operator", 0));
         }
+    }
+    CALL_NEXT();
+}
+OPHANDLER_ABI void op_add_f(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_ADD_F);
+    {
+        auto i_in1 = read_varlen_int(pc);
+        auto i_in2 = read_varlen_int(pc);
+        auto & var1 = vars[i_in1];
+        auto & var2 = vars[i_in2];
+        if (var2.kind == TYPEID_INT)
+            var1.data.real += var2.data.integer;
+        else if (var2.kind == TYPEID_FLOAT)
+            var1.data.real += var2.data.real;
+        else
+            ASSERT_THROW(((void)"unknown type pair for + operator", 0));
     }
     CALL_NEXT();
 }
@@ -826,6 +901,23 @@ OPHANDLER_ABI void op_subimm(OPHANDLER_ARGS)
         default:
             ASSERT_THROW(((void)"unknown type pair for - operator", 0));
         }
+    }
+    CALL_NEXT();
+}
+
+OPHANDLER_ABI void op_subimm_i(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_SUBIMM_I);
+    {
+        auto i_in1 = read_varlen_int(pc);
+        auto var2 = read_immediate(pc);
+        auto & var1 = vars[i_in1];
+        if (var2.kind == TYPEID_INT)
+            var1.data.integer -= var2.data.integer;
+        else if (var2.kind == TYPEID_FLOAT)
+            var1.data.integer = var1.data.integer - var2.data.real;
+        else
+            ASSERT_THROW(((void)"unknown type pair for - operator", 0));
     }
     CALL_NEXT();
 }
@@ -990,13 +1082,21 @@ OPHANDLER_ABI void op_shlimm(OPHANDLER_ARGS)
 {
     INC_PC_FOR_OPCODE(OP_SHLIMM);
     {
-        //auto i_out = read_varlen_int(pc);
         auto i_in1 = read_varlen_int(pc);
         auto var2 = read_immediate(pc);
-        //auto & out = vars[i_out];
         auto & var1 = vars[i_in1];
-        assert(var1.kind == TYPEID_INT && var2.kind == TYPEID_INT);
-        //out = var1;
+        assert(var1.kind == TYPEID_INT);
+        var1.data.integer <<= var2.data.integer;
+    }
+    CALL_NEXT();
+}
+OPHANDLER_ABI void op_shlimm_i(OPHANDLER_ARGS)
+{
+    INC_PC_FOR_OPCODE(OP_SHLIMM_I);
+    {
+        auto i_in1 = read_varlen_int(pc);
+        auto var2 = read_immediate(pc);
+        auto & var1 = vars[i_in1];
         var1.data.integer <<= var2.data.integer;
     }
     CALL_NEXT();
@@ -1076,10 +1176,10 @@ inline Variable Interpreter::call_func(Shared<Function> func, Vec<Variable> args
     (void)args;
     
     Vec<Variable> _vars;
-    printf("allocating %zu var-regs....\n", func->num_vars + func->num_regs);
+    //printf("allocating %zu var-regs....\n", func->num_vars + func->num_regs);
     for (size_t i = 0; i < func->num_vars + func->num_regs; i++)
         _vars.push_back(Variable());
-    printf("allocated %zu var-regs\n", _vars.size());
+    //printf("allocated %zu var-regs\n", _vars.size());
     
     const uint8_t * pc = func->code.data();
     auto vars = _vars.data();

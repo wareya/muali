@@ -1,8 +1,9 @@
 func main():
-    var sum = 0.0
-    var flip = -1.0
+    var sum : float = 0.0
+    var flip : float = -1.0
     for (i in 1 to 1000000001):
         flip = -flip
+        //flip *= -1.0
         //sum += flip / (i*2 - 1)
         sum += flip / (i<<1 - 1)
         //sum += flip / i

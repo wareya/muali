@@ -32,7 +32,7 @@ int main(int argc, char ** argv)
     
     auto grammar = load_grammar(text.data());
     
-    puts("HW!");
+    //puts("HW!");
     
     // debug_print_grammar_points(grammar);
     
@@ -51,7 +51,7 @@ int main(int argc, char ** argv)
     }
     
     size_t i = 0;
-    //if (0)
+    if (0)
     for (auto n : tokens)
     {
         if (n->from_regex)
@@ -72,12 +72,13 @@ int main(int argc, char ** argv)
     
     //print_AST(*asdf);
     
-    puts("bxvlhir");
+    //puts("bxvlhir");
     
     auto compiled = compile_root(*asdf);
     
-    puts("aogiogw");
+    //puts("aogiogw");
     
+    //if (0)
     for (auto func : compiled.funcs)
     {
         puts("----");

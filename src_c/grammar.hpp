@@ -423,7 +423,7 @@ static auto load_grammar(const char * text) -> Grammar
                 }
                 else
                 {
-                    //printf("TODO: %c\n", text[i]);
+                    printf("TODO: %c\n", text[i]);
                     assert(0);
                 }
             }
@@ -1055,7 +1055,7 @@ static auto parse_as(Grammar & grammar, const Vec<Shared<Token>> & tokens, const
         AST_fixup(*ret);
         AST_delete_token_refs(*ret);
     }
-    puts("we");
+    //puts("we");
     clear_parser_global_state();
     return ret;
 }

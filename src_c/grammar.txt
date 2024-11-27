@@ -1,4 +1,4 @@
-RESERVED_KEYWORDS: end if else elif while for return pass goto break continue match switch case
+RESERVED_KEYWORDS: end if else elif while for return pass goto break continue lambda try catch except yield await then with raise throw and or var as true false impl match switch
 
 int:
 rx%[0-9]+%rx
@@ -16,9 +16,15 @@ rx%[a-zA-Z_][a-zA-Z_0-9]*%rx
 null:
 "null"
 
+bool:
+"true" | "false"
+
+primitive_type: 
+"int" | "float" | "bool" | "str" | 
+
 simple_expr: @notokens @flatten
 "(" expr ")"
-int | float | string | null | name
+int | float | string | null | bool | name
 
 funccall: @notokens
 "(" (expr ",")* expr? ")"
@@ -63,9 +69,14 @@ expr:
 if_ternary
 binexp_0
 
+vardec_name_and_type: @notokens
+name ":" name
+name
+
 vardec: @notokens
+"var" vardec_name_and_type "=" expr
 "var" name "=" expr
-"var" name
+"var" vardec_name_and_type
 
 globalvardec: @notokens
 "var" name "=" expr
@@ -101,12 +112,12 @@ while_short: @notokens
 "while" "(" expr ")" simple_block
 
 foreach: @notokens
-"for" "(" name "in" int "to" int ")" ":" block "end"
-"for" "(" name "in" expr ")" ":" block "end"
+"for" "(" vardec_name_and_type "in" int "to" int ")" ":" block "end"
+"for" "(" vardec_name_and_type "in" expr ")" ":" block "end"
 
 foreach_short: @notokens
-"for" "(" name "in" int "to" int ")" simple_block
-"for" "(" name "in" expr ")" simple_block
+"for" "(" vardec_name_and_type "in" int "to" int ")" simple_block
+"for" "(" vardec_name_and_type "in" expr ")" simple_block
 
 return: @notokens
 "return" expr?

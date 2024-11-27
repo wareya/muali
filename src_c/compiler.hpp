@@ -20,6 +20,8 @@ struct ExprInfo {
     Option<size_t> global_var;
     Option<size_t> func_name;
     
+    Option<TypeId> static_type;
+    
     bool is_var_reg()
     {
         return !!var_reg;
@@ -66,6 +68,7 @@ struct ExprInfo {
 
 struct FuncCompInfo {
     Vec<ListMap<String, size_t>> scopes;
+    ListMap<size_t, TypeId> var_types;
     size_t var_index = 0;
     size_t vardec_count = 0;
     
@@ -86,9 +89,23 @@ struct FuncCompInfo {
         size_t _var_index = var_index++;
         assert(_var_index < vardec_count);
         scopes.back().insert(name, _var_index);
-        printf("added var %s\n", name.data());
+        //printf("added var %s\n", name.data());
         return _var_index;
     }
+    
+    void add_var_type(size_t index, TypeId type)
+    {
+        assert(index < vardec_count);
+        var_types.insert(index, type);
+    }
+    
+    size_t get_var_type(size_t index)
+    {
+        if (var_types.count(index))
+            return var_types[index];
+        return TYPEID_INVALID;
+    }
+    
     size_t look_up(String & name)
     {
         for (size_t i = scopes.size(); i > 0; i -= 1)
@@ -98,23 +115,31 @@ struct FuncCompInfo {
         }
         return -1;
     }
+    TypeId parse_type(String & name)
+    {
+        if (name == "int")
+            return TYPEID_INT;
+        if (name == "float")
+            return TYPEID_FLOAT;
+        return TYPEID_INVALID;
+    }
     
     // does nothing if passed a variable
     void free_register(size_t reg)
     {
         if (reg < vardec_count)
             return;
-        freed_registers.push_back(reg); // FIXME breaks some instruction handlers
+        freed_registers.push_back(reg);
     }
     
     size_t alloc_register()
     {
         if (freed_registers.size())
         {
-            printf("reusing reg %zu\n", freed_registers.back());
+            //printf("reusing reg %zu\n", freed_registers.back());
             return freed_registers.pop_back();
         }
-        printf("using new reg %zu\n", next_reg);
+        //printf("using new reg %zu\n", next_reg);
         return next_reg++;
     }
 };
@@ -268,14 +293,19 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
     else if (*node->text == "vardec")
     {
         if (node->children.size() == 1)
-            info.add_var(*node->children[0]->children[0]->text);
+            info.add_var(*node->children[0]->children[0]->children[0]->text);
         else
         {
-            auto _expr = compile_func_inner(node->children[1], func, info, global);
+            auto _expr = compile_func_inner(node->children.back(), func, info, global);
             assert(_expr);
             auto expr = *_expr;
             
-            size_t var_index = info.add_var(*node->children[0]->children[0]->text);
+            size_t var_index = info.add_var(*node->children[0]->children[0]->children[0]->text);
+            if (node->children[0]->children.size() == 2)
+            {
+                auto type = info.parse_type(*node->children[0]->children[1]->children[0]->text);
+                info.add_var_type(var_index, type);
+            }
             
             if (expr.is_immediate())
             {
@@ -288,7 +318,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 push_op(func->code, OP_SET);
                 push_varlen_int(func->code, var_index);
                 push_varlen_int(func->code, *expr.var_reg);
-                printf("!!! emitting declaration assignment with %zu...\n", *expr.var_reg);
+                //printf("!!! emitting declaration assignment with %zu...\n", *expr.var_reg);
             }
             else
                 assert(((void)"TODO", 0));
@@ -320,11 +350,27 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         {
             push_op(func->code, OP_SET);
             push_varlen_int(func->code, var_index);
-            printf("!!! emitting normal assignment with %zu...\n", *expr.var_reg);
+            //printf("!!! emitting normal assignment with %zu...\n", *expr.var_reg);
             push_varlen_int(func->code, *expr.var_reg);
         }
         else
             assert(((void)"TODO", 0));
+    }
+    else if (*node->text == "inplace_negate")
+    {
+        // TODO support globals
+        size_t var_index = info.look_up(*node->children[0]->children[0]->text);
+        if (var_index == -1ULL)
+        {
+            printf("failed to find variable %s\n", node->children[0]->text->data());
+            throw;
+        }
+        
+        if (info.get_var_type(var_index) == TYPEID_FLOAT)
+            push_op(func->code, OP_NEGATE_F);
+        else
+            push_op(func->code, OP_NEGATE);
+        push_varlen_int(func->code, var_index);
     }
     else if (*node->text == "name")
     {
@@ -335,7 +381,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             printf("failed to find variable %s\n", node->children[0]->text->data());
             throw;
         }
-        printf("looked up %s.... found at %zu!!!\n", node->children[0]->text->data(), var_index);
+        //printf("looked up %s.... found at %zu!!!\n", node->children[0]->text->data(), var_index);
         return {ExprInfo::from_var_reg(var_index)};
     }
     else if (node->text->starts_with("base_unexp"))
@@ -377,7 +423,10 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
                 else if (*text == "-")
                 {
                     assert(ret->is_var_reg());
-                    push_op(func->code, OP_NEGATE);
+                    if (info.get_var_type(*ret->var_reg) == TYPEID_FLOAT)
+                        push_op(func->code, OP_NEGATE_F);
+                    else
+                        push_op(func->code, OP_NEGATE);
                     push_varlen_int(func->code, *ret->var_reg);
                     return ret;
                 }
@@ -410,10 +459,15 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             
             auto & op = *node->children[1]->children[0]->text;
             
-            printf("%s\n", op.data());
+            //printf("%s\n", op.data());
             uint16_t opcode;
             if (op == "+" && !expr2.is_immediate())
-                opcode = OP_ADD;
+            {
+                if (expr1.is_var_reg() && info.get_var_type(*expr1.var_reg) == TYPEID_FLOAT)
+                    opcode = OP_ADD_F;
+                else
+                    opcode = OP_ADD;
+            }
             else if (op == "+" && expr2.is_immediate())
                 opcode = OP_ADDIMM;
             else if (op == "-" && !expr2.is_immediate())
@@ -431,7 +485,12 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
             else if (op == "<<" && !expr2.is_immediate())
                 opcode = OP_SHL;
             else if (op == "<<" && expr2.is_immediate())
-                opcode = OP_SHLIMM;
+            {
+                if (expr1.is_var_reg() && info.get_var_type(*expr1.var_reg) == TYPEID_INT)
+                    opcode = OP_SHLIMM_I;
+                else
+                    opcode = OP_SHLIMM;
+            }
             else if (op == ">>" && !expr2.is_immediate())
                 opcode = OP_SHR;
             else if (op == ">>" && expr2.is_immediate())
@@ -512,7 +571,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         
         auto & op = *node->children[1]->children[0]->text;
         
-        printf("%s\n", op.data());
+        //printf("%s\n", op.data());
         uint8_t opcode;
         if (op == "+=" && !expr2.is_immediate())
             opcode = OP_ADD;
@@ -525,7 +584,16 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         else if (op == "*=" && !expr2.is_immediate())
             opcode = OP_MUL;
         else if (op == "*=" && expr2.is_immediate())
-            opcode = OP_MULIMM;
+        {
+            if (info.get_var_type(var_index) == TYPEID_FLOAT && expr2.imm_float && *expr2.imm_float == -1.0)
+            {
+                push_op(func->code, OP_NEGATE_F);
+                push_varlen_int(func->code, var_index);
+                goto out;
+            }
+            else
+                opcode = OP_MULIMM;
+        }
         else if (op == "/=" && !expr2.is_immediate())
             opcode = OP_DIV;
         else if (op == "/=" && expr2.is_immediate())
@@ -546,6 +614,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         
         if (expr2.is_var_reg())
             info.free_register(*expr2.var_reg);
+        out: {}
     }
     else if (node->text->starts_with("return"))
     {
@@ -582,7 +651,7 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
     else if (*node->text == "int")
     {
         int64_t n = strtoll(node->children[0]->text->data(), 0, 10);
-        printf("%zd\n", n);
+        //printf("%zd\n", n);
         //assert(((void)"TODO", 0));
         return {ExprInfo::from_int(n)};
     }
@@ -603,7 +672,13 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
     {
         info.push_scope();
         
-        size_t var_index = info.add_var(*node->children[0]->children[0]->text);
+        size_t var_index = info.add_var(*node->children[0]->children[0]->children[0]->text);
+        if (node->children[0]->children.size() == 2)
+        {
+            auto type = info.parse_type(*node->children[0]->children[1]->children[0]->text);
+            info.add_var_type(var_index, type);
+        }
+        
         size_t n = 1;
         if (node->children.size() == 4)
             n = 2;
@@ -621,6 +696,14 @@ static inline Option<ExprInfo> compile_func_inner(Shared<ASTNode> node, Shared<F
         
         if (expr.imm_int)
         {
+            if (info.get_var_type(var_index) != TYPEID_INVALID)
+            {
+                if (info.get_var_type(var_index) != TYPEID_INT)
+                    assert(((void)"type of foreach variable with int range must also be an int", 0));
+            }
+            else
+                info.add_var_type(var_index, TYPEID_INT);
+            
             if (node->children.size() == 4)
             {
                 auto _expr = compile_func_inner(node->children[1], func, info, global);
@@ -719,8 +802,28 @@ static inline Option<ExprInfo> compile_func(Shared<ASTNode> node, Shared<Functio
     func->code.push_back(0x00);
     return ret;
 }
+static inline void optimize_ast(Shared<ASTNode> & node)
+{
+    if (!node)
+        return;
+    
+    for (auto & child : node->children)
+        optimize_ast(child);
+    
+    if (node->children.size() == 1 && node->text && *node->text == "expr")
+        node = node->children[0];
+    if (node->text && *node->text == "assign" && node->children.size() == 2 && *node->children[1]->text == "base_binexp"
+        && *node->children[1]->children[0]->children[0]->text == "-"
+        && *node->children[1]->children[1]->children[0]->text == *node->children[0]->children[0]->text)
+    {
+        *node->text = "inplace_negate";
+        node->children.erase_at(1);
+    }
+}
 static inline Global compile_root(Shared<ASTNode> root)
 {
+    optimize_ast(root);
+    
     Global global;
     
     for (auto _node : root->children)

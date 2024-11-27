@@ -12,21 +12,20 @@
 #define INTERPRETER_OPCODE_TABLE_BITS 16 // tune: can be from 12 to 16 (inclusive).
 #endif
 
+//#define VARLEN_VARREG_8BIT // fastest, but dangerous
 #define VARLEN_VARREG_16BIT // second-fastest
-//#define VARLEN_VARREG_8BIT // fastest
 // The following defines only affect var-reg operand encoding and not opcode encoding.
-//#define VARLEN_VARREG_SB15 // third-fastest
+//#define VARLEN_VARREG_SB15
 // Sign-bit format that only supports up to 32k vars/registers in a single function. You don't need more than that, right?
-// (Faster than VLQ, which is what you get with no defines. Like VLQ, but limited to less length.)
 //#define VARLEN_VARREG_SB15LE
-// Little endian variant. Very very very slightly slower on my zen4 CPU for reasons I do not understand.
+// Little endian variant.
 //#define VARLEN_VARREG_LEB128
 // LEB128 is little-endian var length int. otherwise VLQ, which is big endian. VLQ decodes faster, so this should be left disabled.
 //#define VARLEN_VARREG_LZ4LIKE
 // The LZ4 compression algorithm uses a very silly unary-like variable length integer scheme for match lengths.
 // This format can be turned on here. It's slow and big, don't use it.
 
-// If none of the above VARLEN_VARREG... defines are defined, VLQ encoding will be used. SB15 mode is faster.
+// If none of the above VARLEN_VARREG... defines are defined, VLQ encoding will be used, which is the third fastest
 
 typedef uint32_t TypeId;
 
@@ -38,8 +37,9 @@ constexpr uint32_t TYPEID_STRING  = 4;
 constexpr uint32_t TYPEID_ARRAY   = 5;
 constexpr uint32_t TYPEID_DICT    = 6;
 constexpr uint32_t TYPEID_FUNC    = 7;
-constexpr uint32_t TYPEID_VARIANT = 255;
-constexpr uint32_t TYPEID_CUSTOM  = 4096;
+constexpr uint32_t TYPEID_VARIANT = 31;
+constexpr uint32_t TYPEID_CUSTOM  = 32;
+constexpr uint32_t TYPEID_INVALID = -1;
 
 struct Function {
     Vec<uint8_t> code;
@@ -66,12 +66,21 @@ constexpr uint8_t OPINFO_CMPLTE       = 0x05;
 constexpr uint16_t OP_SET              = 0x802;
 constexpr uint16_t OP_SETIMM           = 0x803;
 
+constexpr uint16_t OP_SUBIMM_I         = 0x807;
+constexpr uint16_t OP_ADD_F            = 0x814;
+
+constexpr uint16_t OP_SHLIMM_I         = 0x906;
+
+constexpr uint16_t OP_INCI_INT         = 0xA04;
+constexpr uint16_t OP_DECI_INT         = 0xA0F;
+constexpr uint16_t OP_NEGATE_F         = 0xA10;
+
 constexpr uint16_t OP_JINCILT          = 0xD0E;
 constexpr uint16_t OP_JINCILTIMM       = 0xD0F;
+constexpr uint16_t OP_JINCILTIMM_INT   = 0xD10;
 
-
-constexpr uint16_t OP_SQRT             = 0xF00;
-constexpr uint16_t OP_EXIT             = 0xF02;
+constexpr uint16_t OP_SQRT             = 0xF10;
+constexpr uint16_t OP_EXIT             = 0xF12;
 
 constexpr uint16_t OP_TOSTRING         = 0xF00;
 constexpr uint16_t OP_TOINT            = 0xF01;

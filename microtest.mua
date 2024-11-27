@@ -1,7 +1,6 @@
 func main():
     var sum = 0
     for (i in 1 to 1000000001):
-        sum += 1
     end
     return sum
 end
